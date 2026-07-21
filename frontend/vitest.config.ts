@@ -10,7 +10,13 @@ export default defineConfig({
       "@": path.resolve(dirname, "src"),
     },
   },
+  esbuild: {
+    jsx: "automatic",
+    jsxImportSource: "react",
+  },
   test: {
-    environment: "node",
+    environmentMatchGlobs: [["src/test/**/*.dom.test.ts?(x)", "jsdom"]],
+    setupFiles: [path.resolve(dirname, "src/test/setup.ts")],
+    exclude: ["src/test/e2e/**", "node_modules/**", "dist/**", ".next/**"],
   },
 });

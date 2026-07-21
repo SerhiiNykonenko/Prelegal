@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   createDefaultMutualNdaValues,
   flattenZodErrors,
@@ -65,11 +65,38 @@ function PartyFields({
   );
 }
 
-export function MutualNdaForm() {
-  const [values, setValues] = useState<MutualNdaFormData>(() => createDefaultMutualNdaValues());
+export function MutualNdaForm({ initialDate }: { initialDate: string }) {
+  const [values, setValues] = useState<MutualNdaFormData>(() => createDefaultMutualNdaValues(initialDate));
   const [errors, setErrors] = useState<MutualNdaFieldErrors>({});
   const [status, setStatus] = useState<"idle" | "generating" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialDate) {
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    setValues((current) => {
+      if (current.effectiveDate || current.partyOne.signatureDate || current.partyTwo.signatureDate) {
+        return current;
+      }
+
+      return {
+        ...current,
+        effectiveDate: today,
+        partyOne: {
+          ...current.partyOne,
+          signatureDate: today,
+        },
+        partyTwo: {
+          ...current.partyTwo,
+          signatureDate: today,
+        },
+      };
+    });
+  }, [initialDate]);
 
   const preview = useMemo(() => {
     const mndaTerm =

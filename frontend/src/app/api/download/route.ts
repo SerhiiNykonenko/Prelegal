@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const markdown = renderMutualNdaMarkdown(data, templates);
     const pdf = await createMutualNdaPdf(markdown);
 
-    return new NextResponse(pdf, {
+    return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Disposition": 'attachment; filename="mutual-nda.pdf"',
         "Content-Type": "application/pdf",

@@ -12,7 +12,7 @@ export default function Home() {
         </p>
       </section>
 
-      <MutualNdaForm />
+      <MutualNdaForm initialDate="" />
     </main>
   );
 }
