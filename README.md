@@ -11,7 +11,19 @@ The project is under active development and is expected to be completed in one w
 
 ## Getting started
 
-Setup and usage instructions will be added as the project is completed.
+The legacy data assets live at the repository root:
+
+- `catalog.json` and `templates/` contain Common Paper legal agreement templates curated as part of KAN-2.
+
+The Mutual NDA prototype web application lives in `frontend/`.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:3000 to create and download a Mutual NDA PDF.
 
 ## Documentation
 

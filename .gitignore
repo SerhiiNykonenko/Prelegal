@@ -75,6 +75,7 @@ pnpm-debug.log*
 # TypeScript / JavaScript tooling
 *.tsbuildinfo
 next-env.d.ts
+!frontend/next-env.d.ts
 .eslintcache
 
 # OS and editor files
