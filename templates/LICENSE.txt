@@ -1,0 +1,6 @@
+The markdown legal agreement templates in this directory are derived from Common Paper templates published by CommonPaper on GitHub.
+
+These template documents are provided under the Creative Commons Attribution 4.0 International license (CC BY 4.0).
+
+License: https://creativecommons.org/licenses/by/4.0/
+Source organization: https://github.com/CommonPaper
