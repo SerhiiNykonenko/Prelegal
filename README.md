@@ -17,8 +17,8 @@ The legacy data assets live at the repository root:
 
 The current V1 foundation includes:
 
-- `frontend/` — Next.js workspace UI, fake login flow, and Mutual NDA creator
-- `backend/` — FastAPI foundation with SQLite user storage
+- `frontend/` — Next.js workspace UI, fake login flow, and Mutual NDA creator with Chat/Form toggle, review step, and persisted draft state
+- `backend/` — FastAPI foundation with SQLite user storage, persisted draft APIs, and AI chat orchestration via LiteLLM/OpenRouter (Cerebras provider)
 - `scripts/` — platform start/stop helpers for the full stack
 
 ### Full stack startup

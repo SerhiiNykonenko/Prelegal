@@ -11,6 +11,19 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS document_drafts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_email TEXT NOT NULL,
+    document_key TEXT NOT NULL,
+    status TEXT NOT NULL,
+    input_mode TEXT NOT NULL,
+    draft_json TEXT NOT NULL,
+    chat_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(user_email, document_key)
+);
 """
 
 
@@ -24,7 +37,7 @@ def initialize_database(database_path: Path, reset: bool = False) -> None:
         database_path.unlink()
 
     with sqlite3.connect(database_path) as connection:
-        connection.execute(SCHEMA)
+        connection.executescript(SCHEMA)
         connection.commit()
 
 

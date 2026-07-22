@@ -22,6 +22,26 @@ type InputProps = {
   onChange: (value: string) => void;
 };
 
+type MutualNdaEditorProps = {
+  values: MutualNdaFormData;
+  errors: MutualNdaFieldErrors;
+  onChange: (values: MutualNdaFormData) => void;
+  actionSlot?: React.ReactNode;
+};
+
+export function buildMutualNdaPreview(values: MutualNdaFormData) {
+  const mndaTerm =
+    values.mndaTermType === "fixed"
+      ? `Expires ${values.mndaTermYears} year${values.mndaTermYears === 1 ? "" : "s"} from the effective date.`
+      : "Continues until terminated under the MNDA.";
+  const confidentialityTerm =
+    values.confidentialityTermType === "fixed"
+      ? `${values.confidentialityTermYears} year${values.confidentialityTermYears === 1 ? "" : "s"} from the effective date, with trade secret protection while applicable.`
+      : "In perpetuity.";
+
+  return { mndaTerm, confidentialityTerm };
+}
+
 function TextField({ label, name, value, error, type = "text", rows, onChange }: InputProps) {
   return (
     <div className="field">
@@ -65,106 +85,21 @@ function PartyFields({
   );
 }
 
-export function MutualNdaForm({ initialDate }: { initialDate: string }) {
-  const [values, setValues] = useState<MutualNdaFormData>(() => createDefaultMutualNdaValues(initialDate));
-  const [errors, setErrors] = useState<MutualNdaFieldErrors>({});
-  const [status, setStatus] = useState<"idle" | "generating" | "error">("idle");
-  const [message, setMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (initialDate) {
-      return;
-    }
-
-    const today = new Date().toISOString().slice(0, 10);
-
-    setValues((current) => {
-      if (current.effectiveDate || current.partyOne.signatureDate || current.partyTwo.signatureDate) {
-        return current;
-      }
-
-      return {
-        ...current,
-        effectiveDate: today,
-        partyOne: {
-          ...current.partyOne,
-          signatureDate: today,
-        },
-        partyTwo: {
-          ...current.partyTwo,
-          signatureDate: today,
-        },
-      };
-    });
-  }, [initialDate]);
-
-  const preview = useMemo(() => {
-    const mndaTerm =
-      values.mndaTermType === "fixed"
-        ? `Expires ${values.mndaTermYears} year${values.mndaTermYears === 1 ? "" : "s"} from the effective date.`
-        : "Continues until terminated under the MNDA.";
-    const confidentialityTerm =
-      values.confidentialityTermType === "fixed"
-        ? `${values.confidentialityTermYears} year${values.confidentialityTermYears === 1 ? "" : "s"} from the effective date, with trade secret protection while applicable.`
-        : "In perpetuity.";
-
-    return { mndaTerm, confidentialityTerm };
-  }, [values]);
+export function MutualNdaEditor({ values, errors, onChange, actionSlot }: MutualNdaEditorProps) {
+  const preview = useMemo(() => buildMutualNdaPreview(values), [values]);
 
   function setField<Field extends keyof MutualNdaFormData>(field: Field, value: MutualNdaFormData[Field]) {
-    setValues((current) => ({ ...current, [field]: value }));
+    onChange({ ...values, [field]: value });
   }
 
   function setPartyField(partyKey: PartyKey, field: PartyField, value: string) {
-    setValues((current) => ({
-      ...current,
+    onChange({
+      ...values,
       [partyKey]: {
-        ...current[partyKey],
+        ...values[partyKey],
         [field]: value,
       },
-    }));
-  }
-
-  async function downloadPdf() {
-    setMessage(null);
-    const result = mutualNdaSchema.safeParse(values);
-
-    if (!result.success) {
-      setErrors(flattenZodErrors(result.error));
-      return;
-    }
-
-    setErrors({});
-    setStatus("generating");
-
-    try {
-      const response = await fetch("/api/download", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(result.data),
-      });
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        if (payload?.fieldErrors) {
-          setErrors(payload.fieldErrors);
-        }
-        throw new Error(payload?.error ?? "Unable to generate PDF");
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "mutual-nda.pdf";
-      link.click();
-      URL.revokeObjectURL(url);
-      setStatus("idle");
-      setMessage("PDF generated successfully.");
-    } catch (error) {
-      setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Unable to generate PDF");
-    }
+    });
   }
 
   return (
@@ -216,13 +151,7 @@ export function MutualNdaForm({ initialDate }: { initialDate: string }) {
 
         <PartyFields title="Party 1" partyKey="partyOne" values={values.partyOne} errors={errors} onChange={(field, value) => setPartyField("partyOne", field, value)} />
         <PartyFields title="Party 2" partyKey="partyTwo" values={values.partyTwo} errors={errors} onChange={(field, value) => setPartyField("partyTwo", field, value)} />
-
-        <div className="actions">
-          <button className="primary-button" type="button" disabled={status === "generating"} onClick={downloadPdf}>
-            {status === "generating" ? "Generating PDF..." : "Download Mutual NDA PDF"}
-          </button>
-          {message ? <span className={status === "error" ? "error-text" : undefined}>{message}</span> : null}
-        </div>
+        {actionSlot}
       </form>
 
       <aside className="card preview-card" aria-label="Mutual NDA preview">
@@ -258,5 +187,97 @@ export function MutualNdaForm({ initialDate }: { initialDate: string }) {
         </p>
       </aside>
     </div>
+  );
+}
+
+export function MutualNdaForm({ initialDate }: { initialDate: string }) {
+  const [values, setValues] = useState<MutualNdaFormData>(() => createDefaultMutualNdaValues(initialDate));
+  const [errors, setErrors] = useState<MutualNdaFieldErrors>({});
+  const [status, setStatus] = useState<"idle" | "generating" | "error">("idle");
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialDate) {
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    setValues((current) => {
+      if (current.effectiveDate || current.partyOne.signatureDate || current.partyTwo.signatureDate) {
+        return current;
+      }
+
+      return {
+        ...current,
+        effectiveDate: today,
+        partyOne: {
+          ...current.partyOne,
+          signatureDate: today,
+        },
+        partyTwo: {
+          ...current.partyTwo,
+          signatureDate: today,
+        },
+      };
+    });
+  }, [initialDate]);
+
+  async function downloadPdf() {
+    setMessage(null);
+    const result = mutualNdaSchema.safeParse(values);
+
+    if (!result.success) {
+      setErrors(flattenZodErrors(result.error));
+      return;
+    }
+
+    setErrors({});
+    setStatus("generating");
+
+    try {
+      const response = await fetch("/api/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result.data),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        if (payload?.fieldErrors) {
+          setErrors(payload.fieldErrors);
+        }
+        throw new Error(payload?.error ?? "Unable to generate PDF");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "mutual-nda.pdf";
+      link.click();
+      URL.revokeObjectURL(url);
+      setStatus("idle");
+      setMessage("PDF generated successfully.");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Unable to generate PDF");
+    }
+  }
+
+  return (
+    <MutualNdaEditor
+      values={values}
+      errors={errors}
+      onChange={setValues}
+      actionSlot={(
+        <div className="actions">
+          <button className="primary-button" type="button" disabled={status === "generating"} onClick={downloadPdf}>
+            {status === "generating" ? "Generating PDF..." : "Download Mutual NDA PDF"}
+          </button>
+          {message ? <span className={status === "error" ? "error-text" : undefined}>{message}</span> : null}
+        </div>
+      )}
+    />
   );
 }
