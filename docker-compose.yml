@@ -1,0 +1,22 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_PATH: /data/prelegal.db
+      FRONTEND_ORIGIN: http://localhost:3000
+      RESET_DATABASE_ON_STARTUP: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/data
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"

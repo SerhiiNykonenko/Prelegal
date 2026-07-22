@@ -15,15 +15,44 @@ The legacy data assets live at the repository root:
 
 - `catalog.json` and `templates/` contain Common Paper legal agreement templates curated as part of KAN-2.
 
-The Mutual NDA prototype web application lives in `frontend/`.
+The current V1 foundation includes:
+
+- `frontend/` — Next.js workspace UI, fake login flow, and Mutual NDA creator
+- `backend/` — FastAPI foundation with SQLite user storage
+- `scripts/` — platform start/stop helpers for the full stack
+
+### Full stack startup
+
+Use the platform script from the repository root:
+
+- Windows: `scripts/start-windows.ps1`
+- macOS: `scripts/start-mac.sh`
+- Linux: `scripts/start-linux.sh`
+
+The stack exposes:
+
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+
+Use any non-empty email and password on the login screen to enter the prototype workspace.
+
+### Stop the stack
+
+- Windows: `scripts/stop-windows.ps1`
+- macOS: `scripts/stop-mac.sh`
+- Linux: `scripts/stop-linux.sh`
+
+### End-to-end tests
+
+From `frontend/`:
 
 ```bash
-cd frontend
 npm install
-npm run dev
+npm run test:e2e:install
+npm run test:e2e
 ```
 
-Open http://localhost:3000 to create and download a Mutual NDA PDF.
+`test:e2e:install` downloads the Playwright browser binaries needed by the suite.
 
 ## Documentation
 

@@ -12,13 +12,26 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
   },
-  webServer: {
-    command: "npm run dev",
-    cwd: ".",
-    url: "http://127.0.0.1:3000",
-    reuseExistingServer: true,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: "docker compose up --build backend",
+      cwd: "..",
+      url: "http://127.0.0.1:8000/health",
+      reuseExistingServer: true,
+      timeout: 300_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      command: "docker compose up --build",
+      cwd: "..",
+      url: "http://127.0.0.1:3000",
+      reuseExistingServer: true,
+      timeout: 300_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+  ],
   projects: [
     {
       name: "chromium",
