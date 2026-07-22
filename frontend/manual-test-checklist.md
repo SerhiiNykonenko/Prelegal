@@ -1,7 +1,16 @@
 # Mutual NDA manual test checklist
 
 ## Goal
-Use this checklist when validating the Mutual NDA creator after renderer, form, or download changes.
+Use this checklist when validating the Mutual NDA creator after renderer, form, login, routing, or download changes.
+
+## Login and workspace shell
+- [ ] Open `http://localhost:3000` and confirm unauthenticated access redirects to `/login`.
+- [ ] Submit empty login fields and confirm an inline validation error appears.
+- [ ] Submit any non-empty email/password and confirm the app redirects to `/app`.
+- [ ] Confirm the dashboard shows an action to open the Mutual NDA workflow.
+- [ ] Click into the Mutual NDA page and confirm the existing form loads inside the workspace shell.
+- [ ] Use **Sign out** and confirm the app returns to `/login`.
+
 
 ## Environment
 - Start the app from `frontend/` with `npm run dev`.

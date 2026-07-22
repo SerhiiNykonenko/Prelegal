@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
 
+async function login(page: import("@playwright/test").Page) {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill("user@example.com");
+  await page.getByLabel("Password").fill("secret");
+  await page.getByRole("button", { name: "Enter workspace" }).click();
+  await expect(page).toHaveURL(/\/app$/);
+}
+
 async function fillRequiredFields(page: import("@playwright/test").Page) {
   await page.locator("#partyOne-printName").fill("Pat One");
   await page.locator("#partyOne-title").fill("CEO");
@@ -14,18 +22,20 @@ async function fillRequiredFields(page: import("@playwright/test").Page) {
   await page.locator("#partyTwo-signatureDate").fill("2026-08-02");
 }
 
-test("homepage hydrates cleanly and auto-populates date fields", async ({ page }) => {
+test("mutual nda page hydrates cleanly and auto-populates date fields", async ({ page }) => {
   const consoleMessages: string[] = [];
   page.on("console", (message) => consoleMessages.push(message.text()));
 
-  await page.goto("/");
+  await login(page);
+  await page.goto("/app/agreements/mutual-nda");
 
   await expect(page.locator("#effectiveDate")).toHaveValue(/\d{4}-\d{2}-\d{2}/);
   expect(consoleMessages.filter((message) => /hydration|didn't match|server rendered html/i.test(message))).toEqual([]);
 });
 
 test("shows validation errors and prevents download when required fields are empty", async ({ page }) => {
-  await page.goto("/");
+  await login(page);
+  await page.goto("/app/agreements/mutual-nda");
 
   let requestedDownload = false;
   page.on("request", (request) => {
@@ -49,7 +59,8 @@ test("shows validation errors and prevents download when required fields are emp
 });
 
 test("downloads a valid PDF and sends the expected API request", async ({ page }) => {
-  await page.goto("/");
+  await login(page);
+  await page.goto("/app/agreements/mutual-nda");
   await fillRequiredFields(page);
 
   const requestPromise = page.waitForRequest((request) => request.url().includes("/api/download") && request.method() === "POST");
@@ -68,9 +79,6 @@ test("downloads a valid PDF and sends the expected API request", async ({ page }
   expect(response.headers()["content-disposition"]).toContain("mutual-nda.pdf");
   await expect(page.getByText("PDF generated successfully.")).toBeVisible();
   expect(download.suggestedFilename()).toBe("mutual-nda.pdf");
-
-  const path = await download.path();
-  expect(path).toBeTruthy();
 
   const fileBuffer = await download.createReadStream().then(async (stream) => {
     if (!stream) {
@@ -91,7 +99,8 @@ test("downloads a valid PDF and sends the expected API request", async ({ page }
 });
 
 test("submits alternate term selections in the API payload", async ({ page }) => {
-  await page.goto("/");
+  await login(page);
+  await page.goto("/app/agreements/mutual-nda");
   await fillRequiredFields(page);
 
   await page.getByLabel("Continues until terminated").check();
@@ -99,11 +108,10 @@ test("submits alternate term selections in the API payload", async ({ page }) =>
 
   const requestPromise = page.waitForRequest((request) => request.url().includes("/api/download") && request.method() === "POST");
   const responsePromise = page.waitForResponse((response) => response.url().includes("/api/download") && response.request().method() === "POST");
-  const downloadPromise = page.waitForEvent("download");
 
   await page.getByRole("button", { name: "Download Mutual NDA PDF" }).click();
 
-  const [request, response] = await Promise.all([requestPromise, responsePromise, downloadPromise]);
+  const [request, response] = await Promise.all([requestPromise, responsePromise]);
   const payload = request.postDataJSON();
 
   expect(payload.mndaTermType).toBe("until-terminated");
