@@ -1,19 +1,19 @@
 import { MutualNdaWorkspace } from "@/components/document-workspace/MutualNdaWorkspace";
 import { AppShell } from "@/components/AppShell";
+import { documentRegistry } from "@/lib/documentRegistry";
 
 export default function MutualNdaWorkspacePage() {
+  const entry = documentRegistry["mutual-nda"];
+
   return (
-    <AppShell title="Mutual NDA">
+    <AppShell title={entry.title}>
       <section className="workspace-content">
         <section className="hero workspace-hero">
           <p className="eyebrow">Agreements</p>
-          <h2>Create a Mutual NDA</h2>
-          <p>
-            Use AI chat or structured form fields to complete the Common Paper Mutual NDA,
-            review the extracted details, and download a completed PDF for local use.
-          </p>
+          <h2>{entry.title}</h2>
+          <p>{entry.description}</p>
         </section>
-        <MutualNdaWorkspace />
+        <MutualNdaWorkspace documentKey="mutual-nda" />
       </section>
     </AppShell>
   );

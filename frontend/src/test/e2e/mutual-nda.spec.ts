@@ -62,8 +62,9 @@ test("downloads a valid PDF after the review step", async ({ page }) => {
   const [request, response, download] = await Promise.all([requestPromise, responsePromise, downloadPromise]);
   const payload = request.postDataJSON();
 
-  expect(payload.partyOne.printName).toBe("Pat One");
-  expect(payload.partyTwo.printName).toBe("Sam Two");
+  expect(payload.documentKey).toBe("mutual-nda");
+  expect(payload.draft.partyOne.printName).toBe("Pat One");
+  expect(payload.draft.partyTwo.printName).toBe("Sam Two");
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"]).toContain("application/pdf");
   expect(response.headers()["content-disposition"]).toContain("mutual-nda.pdf");
@@ -89,8 +90,8 @@ test("submits alternate term selections in the API payload", async ({ page }) =>
   const [request, response] = await Promise.all([requestPromise, responsePromise]);
   const payload = request.postDataJSON();
 
-  expect(payload.mndaTermType).toBe("until-terminated");
-  expect(payload.confidentialityTermType).toBe("perpetual");
+  expect(payload.draft.mndaTermType).toBe("until-terminated");
+  expect(payload.draft.confidentialityTermType).toBe("perpetual");
   expect(response.status()).toBe(200);
 });
 
@@ -105,11 +106,19 @@ test("persists draft across a page refresh", async ({ page }) => {
   await expect(page.locator("#partyTwo-company")).toHaveValue("Beta");
 });
 
-test("chat mode submits an answer and shows grouped follow-up questions", async ({ page }) => {
+test("chat panel and form are visible side by side", async ({ page }) => {
   await login(page);
   await page.goto("/app/agreements/mutual-nda");
 
-  await page.getByRole("tab", { name: "Chat" }).click();
+  await expect(page.locator(".chat-panel")).toBeVisible();
+  await expect(page.locator(".draft-mode-grid-parallel")).toBeVisible();
+  await expect(page.locator("#chat-message")).toBeVisible();
+  await expect(page.locator("#partyOne-printName")).toBeVisible();
+});
+
+test("chat panel accepts answers and surfaces follow-up questions", async ({ page }) => {
+  await login(page);
+  await page.goto("/app/agreements/mutual-nda");
 
   const responsePromise = page.waitForResponse((response) => response.url().includes("/chat-turn") && response.request().method() === "POST");
 
@@ -120,4 +129,47 @@ test("chat mode submits an answer and shows grouped follow-up questions", async 
   expect(response.status()).toBe(200);
 
   await expect(page.locator(".chat-transcript")).toContainText("Acme and Beta are evaluating");
+  await expect(page.getByText(/party\s*1/i).first()).toBeVisible();
+});
+
+test("chat request to switch documents routes to the DPA workspace", async ({ page }) => {
+  await login(page);
+  await page.goto("/app/agreements/mutual-nda");
+
+  await page.locator("#chat-message").fill("Please switch to a Data Processing Agreement instead.");
+  await page.getByRole("button", { name: "Send answer" }).click();
+
+  const switchResponsePromise = page.waitForResponse((response) => response.url().includes("/chat-turn") && response.request().method() === "POST");
+  const response = await switchResponsePromise;
+  expect(response.status()).toBe(200);
+  const payload = await response.json();
+
+  expect(payload.switchTo).toBe("data-processing-agreement");
+  await expect(page.getByText(/switch to a data processing agreement/i).first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Switch draft" }).click();
+  await expect(page).toHaveURL(/\/app\/agreements\/data-processing-agreement$/);
+  await expect(page.locator("#documentTitle")).toBeVisible();
+});
+
+test("chat textarea regains focus after the assistant responds", async ({ page }) => {
+  await login(page);
+  await page.goto("/app/agreements/mutual-nda");
+
+  const textarea = page.locator("#chat-message");
+  await textarea.click();
+  await textarea.fill("Acme + Beta test.");
+  await page.getByRole("button", { name: "Send answer" }).click();
+
+  await expect(textarea).toBeFocused();
+});
+
+test("unsupported chat request offers the closest supported document", async ({ page }) => {
+  await login(page);
+  await page.goto("/app/agreements/mutual-nda");
+
+  await page.locator("#chat-message").fill("Can I have a GDPR template?");
+  await page.getByRole("button", { name: "Send answer" }).click();
+
+  await expect(page.getByText(/data processing agreement/i).first()).toBeVisible();
 });

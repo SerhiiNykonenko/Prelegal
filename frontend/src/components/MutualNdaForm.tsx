@@ -103,90 +103,55 @@ export function MutualNdaEditor({ values, errors, onChange, actionSlot }: Mutual
   }
 
   return (
-    <div className="creator-grid">
-      <form className="card form-card" onSubmit={(event) => event.preventDefault()}>
-        <section className="form-section">
-          <h2 className="section-title">Agreement details</h2>
-          <TextField label="Purpose" name="purpose" value={values.purpose} error={errors.purpose} rows={3} onChange={(value) => setField("purpose", value)} />
-          <div className="form-row">
-            <TextField label="Effective date" name="effectiveDate" type="date" value={values.effectiveDate} error={errors.effectiveDate} onChange={(value) => setField("effectiveDate", value)} />
-            <TextField label="Governing law" name="governingLaw" value={values.governingLaw} error={errors.governingLaw} onChange={(value) => setField("governingLaw", value)} />
-          </div>
-          <TextField label="Jurisdiction" name="jurisdiction" value={values.jurisdiction} error={errors.jurisdiction} onChange={(value) => setField("jurisdiction", value)} />
-          <TextField label="MNDA modifications" name="modifications" value={values.modifications} error={errors.modifications} rows={3} onChange={(value) => setField("modifications", value)} />
-        </section>
+    <form className="card form-card" onSubmit={(event) => event.preventDefault()}>
+      <section className="form-section">
+        <h2 className="section-title">Agreement details</h2>
+        <TextField label="Purpose" name="purpose" value={values.purpose} error={errors.purpose} rows={3} onChange={(value) => setField("purpose", value)} />
+        <div className="form-row">
+          <TextField label="Effective date" name="effectiveDate" type="date" value={values.effectiveDate} error={errors.effectiveDate} onChange={(value) => setField("effectiveDate", value)} />
+          <TextField label="Governing law" name="governingLaw" value={values.governingLaw} error={errors.governingLaw} onChange={(value) => setField("governingLaw", value)} />
+        </div>
+        <TextField label="Jurisdiction" name="jurisdiction" value={values.jurisdiction} error={errors.jurisdiction} onChange={(value) => setField("jurisdiction", value)} />
+        <TextField label="MNDA modifications" name="modifications" value={values.modifications} error={errors.modifications} rows={3} onChange={(value) => setField("modifications", value)} />
+      </section>
 
-        <section className="form-section">
-          <h2 className="section-title">Terms</h2>
-          <div className="radio-group">
-            <span className="legend">MNDA term</span>
-            <label className="radio-option">
-              <input type="radio" checked={values.mndaTermType === "fixed"} onChange={() => setField("mndaTermType", "fixed")} />
-              Expires after
-              <input aria-label="MNDA term years" type="number" min="1" max="25" value={values.mndaTermYears} onChange={(event) => setField("mndaTermYears", Number(event.target.value))} />
-              year(s)
-            </label>
-            <label className="radio-option">
-              <input type="radio" checked={values.mndaTermType === "until-terminated"} onChange={() => setField("mndaTermType", "until-terminated")} />
-              Continues until terminated
-            </label>
-            {errors.mndaTermYears ? <span className="error-text">{errors.mndaTermYears}</span> : null}
-          </div>
+      <section className="form-section">
+        <h2 className="section-title">Terms</h2>
+        <div className="radio-group">
+          <span className="legend">MNDA term</span>
+          <label className="radio-option">
+            <input type="radio" checked={values.mndaTermType === "fixed"} onChange={() => setField("mndaTermType", "fixed")} />
+            Expires after
+            <input aria-label="MNDA term years" type="number" min="1" max="25" value={values.mndaTermYears} onChange={(event) => setField("mndaTermYears", Number(event.target.value))} />
+            year(s)
+          </label>
+          <label className="radio-option">
+            <input type="radio" checked={values.mndaTermType === "until-terminated"} onChange={() => setField("mndaTermType", "until-terminated")} />
+            Continues until terminated
+          </label>
+          {errors.mndaTermYears ? <span className="error-text">{errors.mndaTermYears}</span> : null}
+        </div>
 
-          <div className="radio-group">
-            <span className="legend">Term of confidentiality</span>
-            <label className="radio-option">
-              <input type="radio" checked={values.confidentialityTermType === "fixed"} onChange={() => setField("confidentialityTermType", "fixed")} />
-              Protects information for
-              <input aria-label="Confidentiality term years" type="number" min="1" max="25" value={values.confidentialityTermYears} onChange={(event) => setField("confidentialityTermYears", Number(event.target.value))} />
-              year(s)
-            </label>
-            <label className="radio-option">
-              <input type="radio" checked={values.confidentialityTermType === "perpetual"} onChange={() => setField("confidentialityTermType", "perpetual")} />
-              In perpetuity
-            </label>
-            {errors.confidentialityTermYears ? <span className="error-text">{errors.confidentialityTermYears}</span> : null}
-          </div>
-        </section>
+        <div className="radio-group">
+          <span className="legend">Term of confidentiality</span>
+          <label className="radio-option">
+            <input type="radio" checked={values.confidentialityTermType === "fixed"} onChange={() => setField("confidentialityTermType", "fixed")} />
+            Protects information for
+            <input aria-label="Confidentiality term years" type="number" min="1" max="25" value={values.confidentialityTermYears} onChange={(event) => setField("confidentialityTermYears", Number(event.target.value))} />
+            year(s)
+          </label>
+          <label className="radio-option">
+            <input type="radio" checked={values.confidentialityTermType === "perpetual"} onChange={() => setField("confidentialityTermType", "perpetual")} />
+            In perpetuity
+          </label>
+          {errors.confidentialityTermYears ? <span className="error-text">{errors.confidentialityTermYears}</span> : null}
+        </div>
+      </section>
 
-        <PartyFields title="Party 1" partyKey="partyOne" values={values.partyOne} errors={errors} onChange={(field, value) => setPartyField("partyOne", field, value)} />
-        <PartyFields title="Party 2" partyKey="partyTwo" values={values.partyTwo} errors={errors} onChange={(field, value) => setPartyField("partyTwo", field, value)} />
-        {actionSlot}
-      </form>
-
-      <aside className="card preview-card" aria-label="Mutual NDA preview">
-        <h2 className="section-title">Cover page preview</h2>
-        <dl className="preview-list">
-          <div>
-            <dt>Purpose</dt>
-            <dd>{values.purpose}</dd>
-          </div>
-          <div>
-            <dt>Effective date</dt>
-            <dd>{values.effectiveDate}</dd>
-          </div>
-          <div>
-            <dt>MNDA term</dt>
-            <dd>{preview.mndaTerm}</dd>
-          </div>
-          <div>
-            <dt>Confidentiality</dt>
-            <dd>{preview.confidentialityTerm}</dd>
-          </div>
-          <div>
-            <dt>Governing law and jurisdiction</dt>
-            <dd>{values.governingLaw}; {values.jurisdiction}</dd>
-          </div>
-          <div>
-            <dt>Parties</dt>
-            <dd>{values.partyOne.company || "Party 1"} and {values.partyTwo.company || "Party 2"}</dd>
-          </div>
-        </dl>
-        <p className="license-note">
-          Generated from Common Paper Mutual NDA Version 1.0 templates, free to use under CC BY 4.0.
-        </p>
-      </aside>
-    </div>
+      <PartyFields title="Party 1" partyKey="partyOne" values={values.partyOne} errors={errors} onChange={(field, value) => setPartyField("partyOne", field, value)} />
+      <PartyFields title="Party 2" partyKey="partyTwo" values={values.partyTwo} errors={errors} onChange={(field, value) => setPartyField("partyTwo", field, value)} />
+      {actionSlot}
+    </form>
   );
 }
 
