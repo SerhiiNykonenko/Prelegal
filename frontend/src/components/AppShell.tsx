@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clearSession, loadSession } from "@/lib/auth";
+import { documentEntries } from "@/lib/documentRegistry";
 
 type AppShellProps = {
   title: string;
@@ -28,7 +29,9 @@ export function AppShell({ title, children }: AppShellProps) {
         </div>
         <nav className="workspace-nav">
           <Link href="/app">Dashboard</Link>
-          <Link href="/app/agreements/mutual-nda">Mutual NDA</Link>
+          {documentEntries.map(([key, entry]) => (
+            <Link key={key} href={`/app/agreements/${key}`}>{entry.title}</Link>
+          ))}
         </nav>
         <div className="workspace-user">
           <p>{session?.email ?? "Prototype user"}</p>

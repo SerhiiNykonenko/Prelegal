@@ -17,11 +17,32 @@ function jsonResponse(body: unknown, ok = true) {
   };
 }
 
+const mutualNdaDraft = {
+  purpose: "",
+  effectiveDate: "2026-08-01",
+  mndaTermType: "fixed",
+  mndaTermYears: 1,
+  confidentialityTermType: "fixed",
+  confidentialityTermYears: 1,
+  governingLaw: "",
+  jurisdiction: "",
+  modifications: "None.",
+  partyOne: { printName: "", title: "", company: "", noticeAddress: "", signatureDate: "2026-08-01" },
+  partyTwo: { printName: "", title: "", company: "", noticeAddress: "", signatureDate: "2026-08-02" },
+};
+
+const mockRouter = { push: vi.fn(), refresh: vi.fn() };
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => mockRouter,
+}));
+
 describe("MutualNdaWorkspace", () => {
   const fetchMock = vi.fn();
 
   beforeEach(() => {
     createSession("user@example.com");
+    mockRouter.push.mockReset();
     fetchMock.mockReset();
     fetchMock.mockImplementation((url: string) => {
       if (url.endsWith("/api/document-drafts/mutual-nda")) {
@@ -30,19 +51,7 @@ describe("MutualNdaWorkspace", () => {
             documentKey: "mutual-nda",
             status: "draft",
             inputMode: "form",
-            draft: {
-              purpose: "",
-              effectiveDate: "2026-08-01",
-              mndaTermType: "fixed",
-              mndaTermYears: 1,
-              confidentialityTermType: "fixed",
-              confidentialityTermYears: 1,
-              governingLaw: "",
-              jurisdiction: "",
-              modifications: "None.",
-              partyOne: { printName: "", title: "", company: "", noticeAddress: "", signatureDate: "2026-08-01" },
-              partyTwo: { printName: "", title: "", company: "", noticeAddress: "", signatureDate: "2026-08-02" },
-            },
+            draft: mutualNdaDraft,
             chat: { messages: [], questionGroups: [] },
           },
         });
@@ -88,7 +97,7 @@ describe("MutualNdaWorkspace", () => {
     expect(screen.getAllByText("Print name is required").length).toBeGreaterThan(0);
   });
 
-  it("switches into chat mode and submits a grouped answer", async () => {
+  it("shows chat and form together and submits a chat answer", async () => {
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
       if (url.endsWith("/api/document-drafts/mutual-nda") && (!init || init.method === undefined || init.method === "GET")) {
         return jsonResponse({
@@ -96,19 +105,7 @@ describe("MutualNdaWorkspace", () => {
             documentKey: "mutual-nda",
             status: "draft",
             inputMode: "form",
-            draft: {
-              purpose: "",
-              effectiveDate: "2026-08-01",
-              mndaTermType: "fixed",
-              mndaTermYears: 1,
-              confidentialityTermType: "fixed",
-              confidentialityTermYears: 1,
-              governingLaw: "",
-              jurisdiction: "",
-              modifications: "None.",
-              partyOne: { printName: "", title: "", company: "", noticeAddress: "", signatureDate: "2026-08-01" },
-              partyTwo: { printName: "", title: "", company: "", noticeAddress: "", signatureDate: "2026-08-02" },
-            },
+            draft: mutualNdaDraft,
             chat: { messages: [], questionGroups: [] },
           },
         });
@@ -119,19 +116,7 @@ describe("MutualNdaWorkspace", () => {
             documentKey: "mutual-nda",
             status: "draft",
             inputMode: "chat",
-            draft: {
-              purpose: "",
-              effectiveDate: "2026-08-01",
-              mndaTermType: "fixed",
-              mndaTermYears: 1,
-              confidentialityTermType: "fixed",
-              confidentialityTermYears: 1,
-              governingLaw: "",
-              jurisdiction: "",
-              modifications: "None.",
-              partyOne: { printName: "", title: "", company: "", noticeAddress: "", signatureDate: "2026-08-01" },
-              partyTwo: { printName: "", title: "", company: "", noticeAddress: "", signatureDate: "2026-08-02" },
-            },
+            draft: mutualNdaDraft,
             chat: {
               messages: [
                 { role: "user", content: "Acme + Beta testing." },
@@ -158,12 +143,60 @@ describe("MutualNdaWorkspace", () => {
 
     await screen.findByLabelText("Effective date");
 
-    await userEvent.click(screen.getByRole("tab", { name: "Chat" }));
-
-    await userEvent.type(screen.getByLabelText("Your answer"), "Acme + Beta testing.");
+    const chatTextarea = screen.getByLabelText("Your answer", { selector: "textarea" });
+    await userEvent.type(chatTextarea, "Acme + Beta testing.");
     await userEvent.click(screen.getByRole("button", { name: "Send answer" }));
 
     expect(await screen.findByText("Acme + Beta testing.")).toBeInTheDocument();
     expect(screen.getByText("Legal settings")).toBeInTheDocument();
+  });
+
+  it("focuses the chat textarea after the assistant responds", async () => {
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.endsWith("/api/document-drafts/mutual-nda") && (!init || init.method === undefined || init.method === "GET")) {
+        return jsonResponse({
+          draft: {
+            documentKey: "mutual-nda",
+            status: "draft",
+            inputMode: "form",
+            draft: mutualNdaDraft,
+            chat: { messages: [], questionGroups: [] },
+          },
+        });
+      }
+      if (url.endsWith("/chat-turn") && init?.method === "POST") {
+        return jsonResponse({
+          draft: {
+            documentKey: "mutual-nda",
+            status: "draft",
+            inputMode: "chat",
+            draft: mutualNdaDraft,
+            chat: {
+              messages: [
+                { role: "user", content: "hi" },
+                { role: "assistant", content: "hello" },
+              ],
+              questionGroups: [],
+            },
+          },
+          assistantMessage: "hello",
+          readyForReview: false,
+        });
+      }
+      return jsonResponse({ error: "unexpected" }, false);
+    });
+
+    render(<MutualNdaWorkspace />);
+
+    await screen.findByLabelText("Effective date");
+
+    const chatTextarea = screen.getByLabelText("Your answer", { selector: "textarea" }) as HTMLTextAreaElement;
+    await userEvent.click(chatTextarea);
+    await userEvent.type(chatTextarea, "hi");
+    await userEvent.click(screen.getByRole("button", { name: "Send answer" }));
+
+    await waitFor(() => {
+      expect(chatTextarea).toHaveFocus();
+    });
   });
 });
