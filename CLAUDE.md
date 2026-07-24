@@ -6,7 +6,7 @@ This is a SaaS product to allow users to draft legal agreements based on templat
 
 @catalog.json
 
-Current state: the project now has a working V1 foundation with a Next.js frontend, a FastAPI backend, Docker-based local orchestration, and a temporary SQLite database. The Mutual NDA workspace now offers an AI-assisted chat flow alongside the structured form, persists drafts and chat history through the backend, requires an explicit review/edit step before download, and continues to use the existing Next.js PDF generation pipeline.
+Current state: the project now has a working V1 foundation plus the KAN-5 AI-assisted Mutual NDA workspace on `main`. The Next.js frontend, FastAPI backend, Docker Compose stack, and reset-on-startup SQLite database are in place. The Mutual NDA workspace offers a Chat/Form toggle around a shared draft that is autosaved through the backend, persists chat history, requires an explicit review/edit step before PDF download, and reuses the existing Next.js PDF generation pipeline. Two polish commits land on top of KAN-5: matching 30px internal padding on the login card, dashboard cards, and workspace sidebar/header, and stopping the `Draft saved` indicator flicker on the Mutual NDA workspace.
 
 ## Development process
 
@@ -21,14 +21,14 @@ When instructed to build a feature:
 
 When writing code to make calls to LLMs, use your Cerebras skill to use LiteLLM via OpenRouter to the `openrouter/openai/gpt-oss-20b:free` model with Cerebras as the inference provider. You should use Structured Outputs so that you can interpret the results and populate fields in the legal document.
 
-There ia an OPENROUTER_API_KEY in the .env file in the project root.
+There is an OPENROUTER_API_KEY in the .env file in the project root. The backend falls back to a deterministic grouped-question scaffold when the key is absent so local startup still works.
 
 ## Technical design
 
 The project is currently packaged for local development with Docker Compose.  
-The backend is in `backend/` as a `uv` project using FastAPI.  
-The frontend is in `frontend/` as a Next.js app.  
-The database uses SQLite and is reset from scratch on stack startup in the containerized flow. The current schema includes a temporary `users` table used by the fake login flow.  
+The backend is in `backend/` as a `uv` project using FastAPI, structured as `app/` (FastAPI entrypoint, Pydantic schema), `app/repositories/` (SQLite data access), and `app/services/` (`document_chat` LLM orchestration).  
+The frontend is in `frontend/` as a Next.js app, with `src/components/document-workspace/` housing the new Chat/Form/Review workspace and `src/lib/` carrying the API client, document registry, and persisted-draft helpers.  
+The database uses SQLite and is reset from scratch on stack startup in the containerized flow. The current schema includes a temporary `users` table used by the fake login flow and a `document_drafts` table keyed by `(user_email, document_key)` that stores status, input mode, the NDA draft JSON, and chat history.  
 Platform start/stop scripts are present in `scripts/`:  
 ```bash
 # Mac
@@ -48,18 +48,22 @@ Local URLs:
 - Frontend: http://localhost:3000
 - Backend: http://localhost:8000
 
-The frontend is currently served as its own container rather than being statically served by FastAPI.
+The frontend is currently served as its own container rather than being statically served by FastAPI. The frontend calls the FastAPI backend directly via `NEXT_PUBLIC_API_BASE_URL` (defaults to `http://localhost:8000`) and forwards the fake session email through the `x-session-email` header alongside the `prelegal_session` cookie.
 
 ## Implementation update
 
 Implemented so far:
-- FastAPI backend foundation with `/health`, `/api/session-login`, and document draft endpoints (`GET/PUT /api/document-drafts/{key}`, `/chat-turn`, `/review`)
+- FastAPI backend foundation with `/health`, `/api/session-login`, and document draft endpoints (`GET/PUT /api/document-drafts/{key}`, `POST /api/document-drafts/{key}/chat-turn`, `POST /api/document-drafts/{key}/review`)
 - SQLite initialization and reset-on-startup behavior for the local stack, including the `document_drafts` table for persisted drafts and chat history
 - Fake login flow with session cookie/header and protected workspace routes
 - Mutual NDA workspace with Chat/Form toggle, server-backed autosave, grouped follow-up questions, and a mandatory review/edit step before PDF download
-- Existing Next.js PDF generation pipeline remains the source of truth for rendering the final Mutual NDA PDF
+- Existing Next.js PDF generation pipeline at `/api/download` remains the source of truth for rendering the final Mutual NDA PDF
 - Docker Compose stack plus Windows/macOS/Linux start and stop scripts
-- Unit, backend, and Playwright coverage for the foundation flow and the new chat/persistence/review behavior
+- Polished UI spacing so the login card, dashboard cards, and workspace sidebar/header share the same 30px internal padding as the document workspace
+- Stable `Draft saved` autosave indicator on the Mutual NDA workspace (no Saving/Saved flicker on idle or after edits)
+- Backend pytest coverage in `tests/test_document_chat.py` and `tests/test_document_drafts.py`
+- Vitest coverage in `frontend/src/test/` (form, schema, render, pdf, download route, login form, workspace DOM)
+- Playwright coverage in `frontend/src/test/e2e/` for the foundation login/dashboard flow and the Mutual NDA hydration, chat, review gating, refresh persistence, and PDF download flows
 
 Not implemented yet:
 - Real authentication
