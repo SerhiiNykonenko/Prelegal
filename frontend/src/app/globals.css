@@ -318,8 +318,14 @@ button {
 
 .login-card {
   width: min(100%, 460px);
+  padding: 30px;
   display: grid;
   gap: 18px;
+}
+.dashboard-card,
+.workspace-sidebar,
+.workspace-header {
+  padding: 30px;
 }
 
 .login-copy,
