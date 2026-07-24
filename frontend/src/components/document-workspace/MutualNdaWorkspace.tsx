@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DocumentChatPanel } from "@/components/document-workspace/DocumentChatPanel";
 import { InputModeToggle } from "@/components/document-workspace/InputModeToggle";
 import { MutualNdaReviewPanel } from "@/components/document-workspace/MutualNdaReviewPanel";
@@ -35,6 +35,15 @@ function toSavePayload(snapshot: DocumentDraftSnapshot): SaveDocumentDraftPayloa
   };
 }
 
+function snapshotSignature(snapshot: DocumentDraftSnapshot): string {
+  return JSON.stringify({
+    status: snapshot.status,
+    inputMode: snapshot.inputMode,
+    draft: snapshot.draft,
+    chat: snapshot.chat,
+  });
+}
+
 export function MutualNdaWorkspace() {
   const [snapshot, setSnapshot] = useState<DocumentDraftSnapshot>(() => createLocalDraft());
   const [step, setStep] = useState<WorkspaceStep>("collect");
@@ -47,6 +56,10 @@ export function MutualNdaWorkspace() {
   const [downloadStatus, setDownloadStatus] = useState<DownloadStatus>("idle");
   const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
   const registry = documentRegistry["mutual-nda"];
+  const isLoadedRef = useRef(false);
+  const lastSavedSignatureRef = useRef<string | null>(null);
+  const saveStateRef = useRef(saveState);
+  saveStateRef.current = saveState;
 
   useEffect(() => {
     let cancelled = false;
@@ -66,12 +79,15 @@ export function MutualNdaWorkspace() {
             },
           };
           setSnapshot(hydratedDraft);
+          lastSavedSignatureRef.current = snapshotSignature(hydratedDraft);
           setSaveState("saved");
+          isLoadedRef.current = true;
         }
       } catch (error) {
         if (!cancelled) {
           setLoadError(error instanceof Error ? error.message : "Unable to load draft");
           setSaveState("error");
+          isLoadedRef.current = true;
         }
       }
     }
@@ -83,16 +99,26 @@ export function MutualNdaWorkspace() {
   }, []);
 
   useEffect(() => {
-    if (saveState === "loading") {
+    if (!isLoadedRef.current) {
+      return;
+    }
+
+    const signature = snapshotSignature(snapshot);
+    if (signature === lastSavedSignatureRef.current) {
       return;
     }
 
     const timeout = window.setTimeout(async () => {
-      setSaveState("saving");
-      setSaveError(null);
+      if (signature !== lastSavedSignatureRef.current) {
+        setSaveState("saving");
+        setSaveError(null);
+      }
       try {
         await persistMutualNdaDraft(toSavePayload(snapshot));
-        setSaveState("saved");
+        lastSavedSignatureRef.current = signature;
+        if (saveStateRef.current !== "error") {
+          setSaveState("saved");
+        }
       } catch (error) {
         setSaveState("error");
         setSaveError(error instanceof Error ? error.message : "Unable to save draft");
@@ -100,12 +126,13 @@ export function MutualNdaWorkspace() {
     }, 700);
 
     return () => window.clearTimeout(timeout);
-  }, [snapshot, saveState]);
+  }, [snapshot]);
 
   const saveLabel = useMemo(() => {
     if (saveState === "loading") return "Loading draft...";
     if (saveState === "saving") return "Saving draft...";
     if (saveState === "error") return "Draft save failed";
+    if (!isLoadedRef.current) return "Loading draft...";
     return "Draft saved";
   }, [saveState]);
 
