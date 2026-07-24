@@ -1,4 +1,6 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from typing import Literal
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class LoginRequest(BaseModel):
@@ -21,3 +23,153 @@ class LoginUser(BaseModel):
 
 class LoginResponse(BaseModel):
     user: LoginUser
+
+
+DocumentKey = Literal["mutual-nda"]
+DraftStatus = Literal["draft", "review"]
+InputMode = Literal["chat", "form"]
+ChatMessageRole = Literal["assistant", "user"]
+
+
+class MutualNdaParty(BaseModel):
+    printName: str = ""
+    title: str = ""
+    company: str = ""
+    noticeAddress: str = ""
+    signatureDate: str = ""
+
+
+class MutualNdaDraft(BaseModel):
+    purpose: str
+    effectiveDate: str
+    mndaTermType: Literal["fixed", "until-terminated"]
+    mndaTermYears: int
+    confidentialityTermType: Literal["fixed", "perpetual"]
+    confidentialityTermYears: int
+    governingLaw: str
+    jurisdiction: str
+    modifications: str
+    partyOne: MutualNdaParty
+    partyTwo: MutualNdaParty
+
+
+class PartialMutualNdaParty(BaseModel):
+    printName: str | None = None
+    title: str | None = None
+    company: str | None = None
+    noticeAddress: str | None = None
+    signatureDate: str | None = None
+
+
+class PartialMutualNdaDraft(BaseModel):
+    purpose: str | None = None
+    effectiveDate: str | None = None
+    mndaTermType: Literal["fixed", "until-terminated"] | None = None
+    mndaTermYears: int | None = None
+    confidentialityTermType: Literal["fixed", "perpetual"] | None = None
+    confidentialityTermYears: int | None = None
+    governingLaw: str | None = None
+    jurisdiction: str | None = None
+    modifications: str | None = None
+    partyOne: PartialMutualNdaParty | None = None
+    partyTwo: PartialMutualNdaParty | None = None
+
+
+class ChatQuestion(BaseModel):
+    key: str
+    prompt: str
+
+
+class ChatQuestionGroup(BaseModel):
+    title: str
+    questions: list[ChatQuestion] = Field(default_factory=list)
+
+
+class ChatMessage(BaseModel):
+    role: ChatMessageRole
+    content: str
+
+
+class DocumentDraftChatState(BaseModel):
+    messages: list[ChatMessage] = Field(default_factory=list)
+    questionGroups: list[ChatQuestionGroup] = Field(default_factory=list)
+
+
+class DocumentDraftSnapshot(BaseModel):
+    documentKey: DocumentKey
+    status: DraftStatus
+    inputMode: InputMode
+    draft: MutualNdaDraft
+    chat: DocumentDraftChatState = Field(default_factory=DocumentDraftChatState)
+
+
+class SaveDocumentDraftRequest(BaseModel):
+    status: DraftStatus
+    inputMode: InputMode
+    draft: MutualNdaDraft
+    chat: DocumentDraftChatState = Field(default_factory=DocumentDraftChatState)
+
+
+class DocumentDraftResponse(BaseModel):
+    draft: DocumentDraftSnapshot
+
+
+class ChatTurnRequest(BaseModel):
+    message: str
+    draft: MutualNdaDraft
+    chat: DocumentDraftChatState = Field(default_factory=DocumentDraftChatState)
+
+    @field_validator("message")
+    @classmethod
+    def validate_message(cls, value: str) -> str:
+        message = value.strip()
+        if not message:
+            raise ValueError("Message is required")
+        return message
+
+
+class ChatTurnResult(BaseModel):
+    assistantMessage: str
+    fieldUpdates: PartialMutualNdaDraft = Field(default_factory=PartialMutualNdaDraft)
+    questionGroups: list[ChatQuestionGroup] = Field(default_factory=list)
+    readyForReview: bool = False
+
+
+class ChatTurnResponse(BaseModel):
+    draft: DocumentDraftSnapshot
+    assistantMessage: str
+    readyForReview: bool
+
+
+class ReviewDraftResponse(BaseModel):
+    fieldErrors: dict[str, str]
+    readyForDownload: bool
+
+
+def create_default_mutual_nda_draft(initial_date: str = "") -> MutualNdaDraft:
+    today = initial_date or ""
+    return MutualNdaDraft(
+        purpose="Evaluating whether to enter into a business relationship with the other party.",
+        effectiveDate=today,
+        mndaTermType="fixed",
+        mndaTermYears=1,
+        confidentialityTermType="fixed",
+        confidentialityTermYears=1,
+        governingLaw="Delaware",
+        jurisdiction="courts located in New Castle, DE",
+        modifications="None.",
+        partyOne=MutualNdaParty(signatureDate=today),
+        partyTwo=MutualNdaParty(signatureDate=today),
+    )
+
+
+def create_default_document_draft(document_key: DocumentKey) -> DocumentDraftSnapshot:
+    if document_key != "mutual-nda":
+        raise ValueError(f"Unsupported document key: {document_key}")
+
+    return DocumentDraftSnapshot(
+        documentKey=document_key,
+        status="draft",
+        inputMode="form",
+        draft=create_default_mutual_nda_draft(),
+    )

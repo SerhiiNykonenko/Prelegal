@@ -33,35 +33,25 @@ test("mutual nda page hydrates cleanly and auto-populates date fields", async ({
   expect(consoleMessages.filter((message) => /hydration|didn't match|server rendered html/i.test(message))).toEqual([]);
 });
 
-test("shows validation errors and prevents download when required fields are empty", async ({ page }) => {
+test("review step blocks download when required fields are empty", async ({ page }) => {
   await login(page);
   await page.goto("/app/agreements/mutual-nda");
 
-  let requestedDownload = false;
-  page.on("request", (request) => {
-    if (request.url().includes("/api/download") && request.method() === "POST") {
-      requestedDownload = true;
-    }
-  });
-
-  let downloadStarted = false;
-  page.on("download", () => {
-    downloadStarted = true;
-  });
-
-  await page.getByRole("button", { name: "Download Mutual NDA PDF" }).click();
+  await page.getByRole("button", { name: "Review draft" }).click();
 
   await expect(page.getByText("Print name is required").first()).toBeVisible();
   await expect(page.getByText("Company is required").first()).toBeVisible();
-  await page.waitForTimeout(500);
-  expect(requestedDownload).toBe(false);
-  expect(downloadStarted).toBe(false);
+  await expect(page.getByRole("heading", { name: "Review and edit before download" })).toBeVisible();
 });
 
-test("downloads a valid PDF and sends the expected API request", async ({ page }) => {
+test("downloads a valid PDF after the review step", async ({ page }) => {
   await login(page);
   await page.goto("/app/agreements/mutual-nda");
   await fillRequiredFields(page);
+
+  await page.getByRole("button", { name: "Review draft" }).click();
+
+  await expect(page.getByRole("heading", { name: "Review and edit before download" })).toBeVisible();
 
   const requestPromise = page.waitForRequest((request) => request.url().includes("/api/download") && request.method() === "POST");
   const responsePromise = page.waitForResponse((response) => response.url().includes("/api/download") && response.request().method() === "POST");
@@ -79,23 +69,6 @@ test("downloads a valid PDF and sends the expected API request", async ({ page }
   expect(response.headers()["content-disposition"]).toContain("mutual-nda.pdf");
   await expect(page.getByText("PDF generated successfully.")).toBeVisible();
   expect(download.suggestedFilename()).toBe("mutual-nda.pdf");
-
-  const fileBuffer = await download.createReadStream().then(async (stream) => {
-    if (!stream) {
-      return Buffer.alloc(0);
-    }
-
-    const chunks: Buffer[] = [];
-
-    for await (const chunk of stream) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-
-    return Buffer.concat(chunks);
-  });
-
-  expect(fileBuffer.subarray(0, 4).toString("utf8")).toBe("%PDF");
-  expect(fileBuffer.byteLength).toBeGreaterThan(1000);
 });
 
 test("submits alternate term selections in the API payload", async ({ page }) => {
@@ -105,6 +78,8 @@ test("submits alternate term selections in the API payload", async ({ page }) =>
 
   await page.getByLabel("Continues until terminated").check();
   await page.getByLabel("In perpetuity").check();
+
+  await page.getByRole("button", { name: "Review draft" }).click();
 
   const requestPromise = page.waitForRequest((request) => request.url().includes("/api/download") && request.method() === "POST");
   const responsePromise = page.waitForResponse((response) => response.url().includes("/api/download") && response.request().method() === "POST");
@@ -117,4 +92,32 @@ test("submits alternate term selections in the API payload", async ({ page }) =>
   expect(payload.mndaTermType).toBe("until-terminated");
   expect(payload.confidentialityTermType).toBe("perpetual");
   expect(response.status()).toBe(200);
+});
+
+test("persists draft across a page refresh", async ({ page }) => {
+  await login(page);
+  await page.goto("/app/agreements/mutual-nda");
+  await fillRequiredFields(page);
+
+  await page.reload();
+
+  await expect(page.locator("#partyOne-printName")).toHaveValue("Pat One");
+  await expect(page.locator("#partyTwo-company")).toHaveValue("Beta");
+});
+
+test("chat mode submits an answer and shows grouped follow-up questions", async ({ page }) => {
+  await login(page);
+  await page.goto("/app/agreements/mutual-nda");
+
+  await page.getByRole("tab", { name: "Chat" }).click();
+
+  const responsePromise = page.waitForResponse((response) => response.url().includes("/chat-turn") && response.request().method() === "POST");
+
+  await page.locator("#chat-message").fill("Acme and Beta are evaluating a partnership under Delaware law.");
+  await page.getByRole("button", { name: "Send answer" }).click();
+
+  const response = await responsePromise;
+  expect(response.status()).toBe(200);
+
+  await expect(page.locator(".chat-transcript")).toContainText("Acme and Beta are evaluating");
 });

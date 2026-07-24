@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir uv
-RUN uv pip install --system fastapi uvicorn email-validator httpx pytest
+RUN uv pip install --system fastapi uvicorn email-validator httpx pytest litellm pydantic
 
 COPY app ./app
 COPY tests ./tests
