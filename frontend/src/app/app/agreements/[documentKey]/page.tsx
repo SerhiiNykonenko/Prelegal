@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { MutualNdaWorkspace } from "@/components/document-workspace/MutualNdaWorkspace";
 import { AppShell } from "@/components/AppShell";
-import { documentRegistry, type documentEntries as _documentEntries } from "@/lib/documentRegistry";
+import { documentRegistry } from "@/lib/documentRegistry";
 import type { DocumentKey } from "@/lib/api";
 
 type RouteParams = { documentKey: string };
@@ -13,8 +13,9 @@ function resolveDocumentKey(value: string): DocumentKey | null {
     : null;
 }
 
-export default function DocumentWorkspacePage({ params }: { params: RouteParams }) {
-  const key = resolveDocumentKey(params.documentKey);
+export default async function DocumentWorkspacePage({ params }: { params: Promise<RouteParams> }) {
+  const { documentKey } = await params;
+  const key = resolveDocumentKey(documentKey);
   if (!key) {
     notFound();
   }

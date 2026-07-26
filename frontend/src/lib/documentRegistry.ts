@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { createDefaultMutualNdaValues, mutualNdaSchema } from "@/lib/mutualNdaSchema";
+import { createDefaultMutualNdaValues, mutualNdaSchema, type MutualNdaFormData } from "@/lib/mutualNdaSchema";
 import type { DocumentKey, GenericDocumentDraft } from "@/lib/api";
 
 const genericPartySchema = z.object({
@@ -46,7 +46,9 @@ export function flattenGenericZodErrors(error: z.ZodError): GenericDocumentField
   return Object.fromEntries(error.issues.map((issue) => [issue.path.join("."), issue.message]));
 }
 
-type DocumentDefinition<TDraft> = {
+type SupportedDocumentDraft = MutualNdaFormData | GenericDocumentDraft;
+
+type DocumentDefinition<TDraft extends SupportedDocumentDraft> = {
   title: string;
   description: string;
   templateFilename: string;
@@ -55,7 +57,7 @@ type DocumentDefinition<TDraft> = {
   reviewSections: string[];
 };
 
-export const documentRegistry: Record<DocumentKey, DocumentDefinition<any>> = {
+export const documentRegistry = {
   "mutual-nda": {
     title: "Mutual NDA",
     description: "Common Paper standard Mutual Non-Disclosure Agreement.",
@@ -144,6 +146,6 @@ export const documentRegistry: Record<DocumentKey, DocumentDefinition<any>> = {
     schema: genericDocumentSchema,
     reviewSections: ["Agreement details", "Parties", "Key terms", "Special terms"],
   },
-};
+} satisfies Record<DocumentKey, DocumentDefinition<SupportedDocumentDraft>>;
 
 export const documentEntries = Object.entries(documentRegistry) as [DocumentKey, (typeof documentRegistry)[DocumentKey]][];

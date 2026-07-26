@@ -75,10 +75,16 @@ Not implemented yet:
 
 Keep `CLAUDE.md` aligned with the actual implemented product state as features land.
 
+## Frontend context
+
+Frontend styling is centralized in `frontend/src/app/globals.css`. Dashboard document links live in `frontend/src/app/app/page.tsx`, and the shared document workspace components live under `frontend/src/components/document-workspace/`.
+
 ## Color Scheme
 
-- Accent Yellow: `#ecad0a`
-- Blue Primary: `#209dd7`
-- Purple Secondary: `#753991` (submit buttons)
+Use the uploaded BWT logo palette:
+
+- Orange Accent: `#e85a00`
+- Purple Primary: `#461157`
+- Blue Secondary: `#00509a`
 - Dark Navy: `#032147` (headings)
 - Gray Text: `#888888`

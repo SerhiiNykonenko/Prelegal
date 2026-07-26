@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   createDefaultMutualNdaValues,
   flattenZodErrors,
@@ -86,8 +86,6 @@ function PartyFields({
 }
 
 export function MutualNdaEditor({ values, errors, onChange, actionSlot }: MutualNdaEditorProps) {
-  const preview = useMemo(() => buildMutualNdaPreview(values), [values]);
-
   function setField<Field extends keyof MutualNdaFormData>(field: Field, value: MutualNdaFormData[Field]) {
     onChange({ ...values, [field]: value });
   }
