@@ -48,7 +48,7 @@ export function DashboardHome() {
         </div>
       </article>
 
-      <article className="card dashboard-card dashboard-card-wide">
+      <article className="card dashboard-card dashboard-card-wide dashboard-card-previous">
         <p className="eyebrow">Previous documents</p>
         <h2>Continue your documents</h2>
         <p>Return to the latest saved draft for each agreement type you have opened.</p>
@@ -59,8 +59,8 @@ export function DashboardHome() {
               const entry = documentRegistry[draft.documentKey];
               return (
                 <Link key={draft.documentKey} className="recent-document-card" href={`/app/agreements/${draft.documentKey}`}>
-                  <span className="dashboard-document-title">{draft.documentTitle || entry.title}</span>
-                  <span className="dashboard-document-description">{entry.title}</span>
+                  <span className="recent-document-title">{entry.title}</span>
+                  <span className="recent-document-description">{draft.documentTitle || entry.description}</span>
                   <span className="recent-document-meta">{draft.status} · Updated {formatDate(draft.updatedAt)}</span>
                 </Link>
               );

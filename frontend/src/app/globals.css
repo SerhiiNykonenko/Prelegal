@@ -389,6 +389,86 @@ button {
   overflow-wrap: anywhere;
 }
 
+.dashboard-card-previous {
+  align-content: start;
+  gap: 10px;
+}
+
+.dashboard-card-previous .eyebrow {
+  justify-self: start;
+  width: auto;
+  max-width: max-content;
+  margin: 0 0 4px;
+}
+
+.dashboard-card-previous h2 {
+  margin-top: 0;
+}
+
+.dashboard-card-previous > p:not(.eyebrow):not(.empty-state) {
+  max-width: 720px;
+  margin: 0 0 8px;
+}
+
+.dashboard-card-previous .recent-document-list {
+  margin-top: 8px;
+}
+
+.dashboard-card-previous .empty-state {
+  margin-top: 8px;
+}
+
+.recent-document-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.recent-document-card {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 14px 18px;
+  border-radius: 20px;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 12px 28px rgba(3, 33, 71, 0.08);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.recent-document-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(3, 33, 71, 0.12);
+  border-color: rgba(0, 80, 154, 0.28);
+}
+
+.recent-document-title {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--color-heading);
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.recent-document-description {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-document-meta {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: capitalize;
+  margin-top: 2px;
+}
+
 .workspace-card {
   padding: 30px;
   display: grid;
