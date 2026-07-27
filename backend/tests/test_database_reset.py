@@ -15,8 +15,8 @@ def test_reset_flag_recreates_existing_database(tmp_path: Path) -> None:
 
     with sqlite3.connect(database_path) as connection:
         connection.execute(
-            "INSERT INTO users (email, password_text, created_at, updated_at) VALUES (?, ?, ?, ?)",
-            ("user@example.com", "secret", "now", "now"),
+            "INSERT INTO users (email, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            ("user@example.com", "scrypt$fake$hash", "now", "now"),
         )
         connection.commit()
 
@@ -33,8 +33,8 @@ def test_initialize_database_preserves_existing_database_without_reset(tmp_path:
 
     with sqlite3.connect(database_path) as connection:
         connection.execute(
-            "INSERT INTO users (email, password_text, created_at, updated_at) VALUES (?, ?, ?, ?)",
-            ("user@example.com", "secret", "now", "now"),
+            "INSERT INTO users (email, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            ("user@example.com", "scrypt$fake$hash", "now", "now"),
         )
         connection.commit()
 

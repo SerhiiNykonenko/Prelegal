@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { clearSession, loadSession } from "@/lib/auth";
+import { signOut } from "@/lib/api";
+import { clearSession } from "@/lib/auth";
 import { documentEntries } from "@/lib/documentRegistry";
 
 type AppShellProps = {
@@ -12,9 +13,9 @@ type AppShellProps = {
 
 export function AppShell({ title, children }: AppShellProps) {
   const router = useRouter();
-  const session = loadSession();
 
-  function handleSignOut() {
+  async function handleSignOut() {
+    await signOut();
     clearSession();
     router.push("/login");
     router.refresh();
@@ -34,7 +35,7 @@ export function AppShell({ title, children }: AppShellProps) {
           ))}
         </nav>
         <div className="workspace-user">
-          <p>{session?.email ?? "Prototype user"}</p>
+          <p>Secure workspace</p>
           <button className="secondary-button" type="button" onClick={handleSignOut}>Sign out</button>
         </div>
       </aside>

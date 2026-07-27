@@ -52,6 +52,7 @@ export function MutualNdaReviewPanel({
             <dd>{values.partyOne.company || "Party 1"} and {values.partyTwo.company || "Party 2"}</dd>
           </div>
         </dl>
+        <p className="disclaimer-text">This document is a draft generated for review and should be reviewed by qualified legal counsel before use.</p>
         <div className="actions">
           <button className="secondary-button" type="button" onClick={onBackToDraft}>Back to draft</button>
           <button className="primary-button" type="button" disabled={status === "generating"} onClick={onDownload}>

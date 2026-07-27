@@ -7,8 +7,9 @@ from app.main import app
 from app.services.document_chat import DocumentChatService
 
 
-def _client_headers() -> dict[str, str]:
-    return {"x-session-email": "user@example.com"}
+def _register(client: TestClient) -> None:
+    response = client.post("/api/auth/sign-up", json={"email": "user@example.com", "password": "secret"})
+    assert response.status_code == 200, response.text
 
 
 def _complete_draft() -> dict:
@@ -73,9 +74,9 @@ def test_chat_turn_returns_missing_questions(tmp_path: Path, monkeypatch) -> Non
     monkeypatch.setenv("DATABASE_PATH", str(database_path))
 
     with TestClient(app) as client:
+        _register(client)
         response = client.post(
             "/api/document-drafts/mutual-nda/chat-turn",
-            headers=_client_headers(),
             json={"message": "Acme and Beta are exploring a partnership.", "draft": _empty_draft(), "chat": {"messages": [], "questionGroups": []}},
         )
 
@@ -93,9 +94,9 @@ def test_chat_turn_signals_ready_when_draft_complete(tmp_path: Path, monkeypatch
     monkeypatch.setenv("DATABASE_PATH", str(database_path))
 
     with TestClient(app) as client:
+        _register(client)
         response = client.post(
             "/api/document-drafts/mutual-nda/chat-turn",
-            headers=_client_headers(),
             json={"message": "All fields look correct.", "draft": _complete_draft(), "chat": {"messages": [], "questionGroups": []}},
         )
 
@@ -108,9 +109,9 @@ def test_review_endpoint_blocks_missing_required_fields(tmp_path: Path, monkeypa
     monkeypatch.setenv("DATABASE_PATH", str(database_path))
 
     with TestClient(app) as client:
+        _register(client)
         response = client.post(
             "/api/document-drafts/mutual-nda/review",
-            headers=_client_headers(),
             json={"status": "review", "inputMode": "form", "draft": _empty_draft(), "chat": {"messages": [], "questionGroups": []}},
         )
 
@@ -127,9 +128,9 @@ def test_review_endpoint_allows_valid_draft(tmp_path: Path, monkeypatch) -> None
     monkeypatch.setenv("DATABASE_PATH", str(database_path))
 
     with TestClient(app) as client:
+        _register(client)
         response = client.post(
             "/api/document-drafts/mutual-nda/review",
-            headers=_client_headers(),
             json={"status": "review", "inputMode": "form", "draft": _complete_draft(), "chat": {"messages": [], "questionGroups": []}},
         )
 
@@ -148,9 +149,9 @@ def test_chat_turn_follow_up_questions_reflect_applied_updates(tmp_path: Path, m
     draft["modifications"] = "None."
 
     with TestClient(app) as client:
+        _register(client)
         response = client.post(
             "/api/document-drafts/mutual-nda/chat-turn",
-            headers=_client_headers(),
             json={"message": "We need Delaware governing law.", "draft": draft, "chat": {"messages": [], "questionGroups": []}},
         )
 
@@ -171,9 +172,9 @@ def test_chat_turn_switches_to_requested_document(tmp_path: Path, monkeypatch) -
     monkeypatch.setenv("DATABASE_PATH", str(database_path))
 
     with TestClient(app) as client:
+        _register(client)
         response = client.post(
             "/api/document-drafts/mutual-nda/chat-turn",
-            headers=_client_headers(),
             json={
                 "message": "Actually, please switch to a Data Processing Agreement instead.",
                 "draft": _empty_draft(),
@@ -206,9 +207,9 @@ def test_generic_document_review_blocks_missing_fields(tmp_path: Path, monkeypat
     }
 
     with TestClient(app) as client:
+        _register(client)
         response = client.post(
             "/api/document-drafts/data-processing-agreement/review",
-            headers=_client_headers(),
             json={"status": "review", "inputMode": "form", "draft": empty_generic, "chat": {"messages": [], "questionGroups": []}},
         )
 
@@ -242,9 +243,9 @@ def test_generic_chat_turn_uses_plain_text_when_provider_skips_structured_output
     }
 
     with TestClient(app) as client:
+        _register(client)
         response = client.post(
             "/api/document-drafts/data-processing-agreement/chat-turn",
-            headers=_client_headers(),
             json={
                 "status": "draft",
                 "inputMode": "chat",
@@ -292,9 +293,9 @@ def test_generic_chat_turn_hides_malformed_json_payload(tmp_path: Path, monkeypa
     }
 
     with TestClient(app) as client:
+        _register(client)
         response = client.post(
             "/api/document-drafts/service-level-agreement/chat-turn",
-            headers=_client_headers(),
             json={
                 "status": "draft",
                 "inputMode": "chat",
@@ -336,9 +337,9 @@ def test_generic_chat_turn_extracts_assistant_reply_from_mixed_text(tmp_path: Pa
     }
 
     with TestClient(app) as client:
+        _register(client)
         response = client.post(
             "/api/document-drafts/service-level-agreement/chat-turn",
-            headers=_client_headers(),
             json={
                 "status": "draft",
                 "inputMode": "chat",
@@ -379,9 +380,9 @@ def test_generic_chat_turn_extracts_markdown_assistant_label(tmp_path: Path, mon
     }
 
     with TestClient(app) as client:
+        _register(client)
         response = client.post(
             "/api/document-drafts/service-level-agreement/chat-turn",
-            headers=_client_headers(),
             json={
                 "status": "draft",
                 "inputMode": "chat",
@@ -437,9 +438,9 @@ def test_generic_chat_turn_applies_field_updates(tmp_path: Path, monkeypatch) ->
     }
 
     with TestClient(app) as client:
+        _register(client)
         response = client.post(
             "/api/document-drafts/service-level-agreement/chat-turn",
-            headers=_client_headers(),
             json={
                 "status": "draft",
                 "inputMode": "chat",

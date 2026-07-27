@@ -3,7 +3,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
-class LoginRequest(BaseModel):
+class AuthRequest(BaseModel):
     email: EmailStr
     password: str
 
@@ -16,13 +16,17 @@ class LoginRequest(BaseModel):
         return password
 
 
-class LoginUser(BaseModel):
+class AuthUser(BaseModel):
     id: int
     email: EmailStr
 
 
-class LoginResponse(BaseModel):
-    user: LoginUser
+class AuthResponse(BaseModel):
+    user: AuthUser
+
+
+class SessionResponse(BaseModel):
+    user: AuthUser
 
 
 DocumentKey = Literal[
@@ -181,6 +185,17 @@ class ChatTurnResponse(BaseModel):
 class ReviewDraftResponse(BaseModel):
     fieldErrors: dict[str, str]
     readyForDownload: bool
+
+
+class RecentDocumentDraftSummary(BaseModel):
+    documentKey: DocumentKey
+    status: str
+    updatedAt: str
+    documentTitle: str
+
+
+class RecentDocumentDraftsResponse(BaseModel):
+    drafts: list[RecentDocumentDraftSummary]
 
 
 def create_default_mutual_nda_draft(initial_date: str = "") -> MutualNdaDraft:

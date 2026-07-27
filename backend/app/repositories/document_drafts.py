@@ -1,11 +1,13 @@
 import json
 import sqlite3
 from datetime import UTC, datetime
+from typing import Any
 
 from app.repositories.users import normalize_email
 from app.schema import (
     DocumentDraftChatState,
     DocumentDraftSnapshot,
+    RecentDocumentDraftSummary,
     SaveDocumentDraftRequest,
     create_default_document_draft,
 )
@@ -79,6 +81,48 @@ def get_or_create_document_draft(
     )
     connection.commit()
     return snapshot
+
+
+def list_recent_document_drafts(
+    connection: sqlite3.Connection,
+    *,
+    user_email: str,
+) -> list[RecentDocumentDraftSummary]:
+    normalized_email = normalize_email(user_email)
+    rows = connection.execute(
+        """
+        SELECT document_key, status, updated_at, draft_json
+        FROM document_drafts
+        WHERE user_email = ?
+        ORDER BY updated_at DESC
+        """,
+        (normalized_email,),
+    ).fetchall()
+
+    return [
+        RecentDocumentDraftSummary(
+            documentKey=row["document_key"],
+            status=row["status"],
+            updatedAt=row["updated_at"],
+            documentTitle=_extract_document_title(json.loads(row["draft_json"]), row["document_key"]),
+        )
+        for row in rows
+    ]
+
+
+def _extract_document_title(draft_payload: dict[str, Any], document_key: str) -> str:
+    title = draft_payload.get("documentTitle")
+    if isinstance(title, str) and title.strip():
+        return title.strip()
+
+    party_one = draft_payload.get("partyOne")
+    party_two = draft_payload.get("partyTwo")
+    if isinstance(party_one, dict) or isinstance(party_two, dict):
+        one_company = party_one.get("company") if isinstance(party_one, dict) else ""
+        two_company = party_two.get("company") if isinstance(party_two, dict) else ""
+        return f"{one_company or 'Party 1'} and {two_company or 'Party 2'}"
+
+    return document_key.replace("-", " ").title()
 
 
 def save_document_draft(
