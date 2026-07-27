@@ -58,6 +58,7 @@ Implemented so far:
 - Fake login flow with session cookie/header and protected workspace routes
 - Shared document registry that backs every supported agreement, including the Mutual NDA tokenized editor and a generic draft schema for every other Common Paper template (Cloud Service Agreement, SLA, Professional Services Agreement, Data Processing Agreement, Design Partner Agreement, AI Addendum, Pilot Agreement, Software License Agreement, Partnership Agreement, Business Associate Agreement)
 - Generic side-by-side chat + form workspace with document-key aware autosave, follow-up questions (after extracted updates), review/edit step, and PDF download
+- Generic document chat extraction now applies supported field updates back into the draft and filters mixed model output so the user sees only natural-language assistant text instead of raw JSON/debug-like payloads
 - In-chat detection of document switches and unsupported requests, with a one-click Switch button that loads the closest supported document
 - Chat textarea auto-refocus after the assistant response
 - Generic PDF route at `/api/download` that renders the Mutual NDA through the existing tokenized pipeline and renders every other agreement as a generated summary section plus the static template body

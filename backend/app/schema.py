@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -165,7 +165,7 @@ class ChatTurnRequest(BaseModel):
 
 class ChatTurnResult(BaseModel):
     assistantMessage: str
-    fieldUpdates: PartialMutualNdaDraft = Field(default_factory=PartialMutualNdaDraft)
+    fieldUpdates: dict[str, Any] = Field(default_factory=dict)
     questionGroups: list[ChatQuestionGroup] = Field(default_factory=list)
     readyForReview: bool = False
     switchTo: DocumentKey | None = None

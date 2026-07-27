@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from typing import Any, Optional
@@ -176,13 +177,13 @@ class DocumentChatService:
             return self._build_switch_result(switch_target)
 
         assistant_message = ""
-        field_updates: PartialMutualNdaDraft = PartialMutualNdaDraft()
+        field_updates: dict[str, Any] = {}
 
         if self.model_enabled:
             try:
                 if isinstance(request.draft, MutualNdaDraft):
                     extraction = self._run_llm_extraction_nda(request)
-                    field_updates = extraction.fieldUpdates
+                    field_updates = extraction.fieldUpdates.model_dump(exclude_unset=True)
                     assistant_message = extraction.assistantMessage
                 elif isinstance(request.draft, GenericDocumentDraft):
                     extraction = self._run_llm_extraction_generic(request)
@@ -224,7 +225,7 @@ class DocumentChatService:
         )
         return ChatTurnResult(
             assistantMessage=message,
-            fieldUpdates=PartialMutualNdaDraft(),
+            fieldUpdates={},
             questionGroups=_default_groups_for_key(target),
             readyForReview=False,
             switchTo=target,
@@ -251,13 +252,11 @@ class DocumentChatService:
                 {"role": "user", "content": user_prompt},
             ],
             response_format=LlmExtractionNn,
-            reasoning_effort="low",
             extra_body=self._extra_body,
             api_key=self._api_key,
         )
 
-        content = response["choices"][0]["message"]["content"]
-        return LlmExtractionNn.model_validate(content)
+        return _parse_structured_completion(response, LlmExtractionNn)
 
     def _run_llm_extraction_generic(self, request: ChatTurnRequest) -> LlmExtractionGeneric:
         from litellm import completion
@@ -280,27 +279,93 @@ class DocumentChatService:
                 {"role": "user", "content": user_prompt},
             ],
             response_format=LlmExtractionGeneric,
-            reasoning_effort="low",
             extra_body=self._extra_body,
             api_key=self._api_key,
         )
 
-        content = response["choices"][0]["message"]["content"]
-        return LlmExtractionGeneric.model_validate(content)
+        return _parse_structured_completion(response, LlmExtractionGeneric)
 
 
-def _generic_to_partial_updates(extraction: LlmExtractionGeneric) -> PartialMutualNdaDraft:
-    return PartialMutualNdaDraft()
+def _parse_structured_completion(response: Any, model_class: type[BaseModel]) -> BaseModel:
+    message = response["choices"][0]["message"]
+    parsed = message.get("parsed")
+    if parsed is not None:
+        return model_class.model_validate(parsed)
+
+    content = message.get("content")
+    if isinstance(content, list):
+        text_parts = [part.get("text", "") for part in content if isinstance(part, dict)]
+        content = "".join(text_parts).strip()
+
+    if isinstance(content, str):
+        stripped = _strip_code_fences(content.strip())
+        assistant_reply = _extract_assistant_reply(stripped)
+        if assistant_reply is not None:
+            return model_class.model_validate({"assistantMessage": assistant_reply})
+        if _looks_like_structured_payload(stripped):
+            try:
+                return model_class.model_validate(json.loads(stripped))
+            except json.JSONDecodeError:
+                return model_class()
+        return model_class.model_validate({"assistantMessage": stripped})
+
+    return model_class.model_validate(content)
 
 
-def apply_partial_updates(draft: DocumentDraft, updates: PartialMutualNdaDraft) -> DocumentDraft:
+def _extract_assistant_reply(content: str) -> str | None:
+    markdown_match = re.search(r"\*\*Assistant(?: reply)?:\*\*\s*(.+)", content, re.IGNORECASE | re.DOTALL)
+    if markdown_match:
+        return markdown_match.group(1).strip()
+
+    label_match = re.search(r"assistant(?: reply)?:\s*(.+)", content, re.IGNORECASE | re.DOTALL)
+    if label_match:
+        return label_match.group(1).strip()
+
+    return None
+
+
+def _strip_code_fences(content: str) -> str:
+    if not content.startswith("```"):
+        return content
+
+    lines = content.splitlines()
+    if not lines:
+        return content
+
+    if lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
+
+
+def _looks_like_structured_payload(content: str) -> bool:
+    return content.startswith("{") or content.startswith("[")
+
+
+
+
+def _generic_to_partial_updates(extraction: LlmExtractionGeneric) -> dict[str, Any]:
+    return extraction.model_dump(exclude_none=True, exclude={"assistantMessage"})
+
+
+def apply_partial_updates(draft: DocumentDraft, updates: dict[str, Any]) -> DocumentDraft:
     if isinstance(draft, MutualNdaDraft):
-        return _apply_partial_mutual_nda(draft, updates)
+        return _apply_partial_mutual_nda(draft, PartialMutualNdaDraft.model_validate(updates))
 
     if isinstance(draft, GenericDocumentDraft):
-        return draft.model_copy(deep=True)
+        return _apply_partial_generic_document(draft, updates)
 
     return draft
+
+
+def _apply_partial_generic_document(draft: GenericDocumentDraft, updates: dict[str, Any]) -> GenericDocumentDraft:
+    merged = draft.model_copy(deep=True)
+    for field, value in updates.items():
+        if value is None or field == "parties":
+            continue
+        setattr(merged, field, value)
+    return merged
 
 
 def _apply_partial_mutual_nda(draft: MutualNdaDraft, updates: PartialMutualNdaDraft) -> MutualNdaDraft:

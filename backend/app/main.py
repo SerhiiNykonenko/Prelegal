@@ -180,7 +180,7 @@ def create_chat_turn(
             "questionGroups": result.questionGroups,
         }
     )
-    updated_draft = apply_draft_updates(payload.draft, result.fieldUpdates.model_dump(exclude_unset=True))
+    updated_draft = apply_draft_updates(payload.draft, result.fieldUpdates)
 
     draft_payload = SaveDocumentDraftRequest(
         status="review" if result.readyForReview else "draft",
@@ -244,7 +244,12 @@ def _apply_mutual_nda_updates(draft: MutualNdaDraft, updates: dict[str, Any]) ->
 
 
 def _apply_generic_updates(draft: GenericDocumentDraft, updates: dict[str, Any]) -> GenericDocumentDraft:
-    return draft.model_copy(deep=True)
+    draft_data = draft.model_dump(mode="json")
+    for field, value in updates.items():
+        if value is None or field == "parties":
+            continue
+        draft_data[field] = value
+    return GenericDocumentDraft.model_validate(draft_data)
 
 
 def validate_draft_for_review(draft: DocumentDraft) -> dict[str, str]:
