@@ -12,6 +12,19 @@ export type LoginResponse = {
   };
 };
 
+export type DocumentKey =
+  | "mutual-nda"
+  | "cloud-service-agreement"
+  | "service-level-agreement"
+  | "professional-services-agreement"
+  | "data-processing-agreement"
+  | "design-partner-agreement"
+  | "ai-addendum"
+  | "pilot-agreement"
+  | "software-license-agreement"
+  | "partnership-agreement"
+  | "business-associate-agreement";
+
 export type MutualNdaParty = {
   printName: string;
   title: string;
@@ -34,6 +47,27 @@ export type MutualNdaDraft = {
   partyTwo: MutualNdaParty;
 };
 
+export type GenericDocumentParty = {
+  role: string;
+  name: string;
+  title: string;
+  company: string;
+  email: string;
+  address: string;
+};
+
+export type GenericDocumentDraft = {
+  documentTitle: string;
+  effectiveDate: string;
+  businessPurpose: string;
+  governingLaw: string;
+  keyTerms: string;
+  specialTerms: string;
+  parties: GenericDocumentParty[];
+};
+
+export type DocumentDraft = MutualNdaDraft | GenericDocumentDraft;
+
 export type ChatMessage = {
   role: "assistant" | "user";
   content: string;
@@ -55,10 +89,10 @@ export type DocumentDraftChatState = {
 };
 
 export type DocumentDraftSnapshot = {
-  documentKey: "mutual-nda";
+  documentKey: DocumentKey;
   status: "draft" | "review";
   inputMode: "chat" | "form";
-  draft: MutualNdaDraft;
+  draft: DocumentDraft;
   chat: DocumentDraftChatState;
 };
 
@@ -69,7 +103,7 @@ export type DocumentDraftResponse = {
 export type SaveDocumentDraftPayload = {
   status: "draft" | "review";
   inputMode: "chat" | "form";
-  draft: MutualNdaDraft;
+  draft: DocumentDraft;
   chat: DocumentDraftChatState;
 };
 
@@ -77,6 +111,7 @@ export type ChatTurnResponse = {
   draft: DocumentDraftSnapshot;
   assistantMessage: string;
   readyForReview: boolean;
+  switchTo?: DocumentKey | null;
 };
 
 export type ReviewDraftResponse = {
@@ -143,12 +178,12 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
   return response.json() as Promise<LoginResponse>;
 }
 
-export async function getDocumentDraft(documentKey: "mutual-nda"): Promise<DocumentDraftResponse> {
+export async function getDocumentDraft(documentKey: DocumentKey): Promise<DocumentDraftResponse> {
   const response = await apiFetch(`/api/document-drafts/${documentKey}`);
   return response.json() as Promise<DocumentDraftResponse>;
 }
 
-export async function saveDocumentDraft(documentKey: "mutual-nda", payload: SaveDocumentDraftPayload): Promise<DocumentDraftResponse> {
+export async function saveDocumentDraft(documentKey: DocumentKey, payload: SaveDocumentDraftPayload): Promise<DocumentDraftResponse> {
   const response = await apiFetch(`/api/document-drafts/${documentKey}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -157,7 +192,7 @@ export async function saveDocumentDraft(documentKey: "mutual-nda", payload: Save
   return response.json() as Promise<DocumentDraftResponse>;
 }
 
-export async function sendDocumentChatTurn(documentKey: "mutual-nda", payload: { message: string; draft: MutualNdaDraft; chat: DocumentDraftChatState; }): Promise<ChatTurnResponse> {
+export async function sendDocumentChatTurn(documentKey: DocumentKey, payload: { message: string; draft: DocumentDraft; chat: DocumentDraftChatState; }): Promise<ChatTurnResponse> {
   const response = await apiFetch(`/api/document-drafts/${documentKey}/chat-turn`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -166,7 +201,7 @@ export async function sendDocumentChatTurn(documentKey: "mutual-nda", payload: {
   return response.json() as Promise<ChatTurnResponse>;
 }
 
-export async function reviewDocumentDraft(documentKey: "mutual-nda", payload: SaveDocumentDraftPayload): Promise<ReviewDraftResponse> {
+export async function reviewDocumentDraft(documentKey: DocumentKey, payload: SaveDocumentDraftPayload): Promise<ReviewDraftResponse> {
   const response = await apiFetch(`/api/document-drafts/${documentKey}/review`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -25,7 +25,19 @@ class LoginResponse(BaseModel):
     user: LoginUser
 
 
-DocumentKey = Literal["mutual-nda"]
+DocumentKey = Literal[
+    "mutual-nda",
+    "cloud-service-agreement",
+    "service-level-agreement",
+    "professional-services-agreement",
+    "data-processing-agreement",
+    "design-partner-agreement",
+    "ai-addendum",
+    "pilot-agreement",
+    "software-license-agreement",
+    "partnership-agreement",
+    "business-associate-agreement",
+]
 DraftStatus = Literal["draft", "review"]
 InputMode = Literal["chat", "form"]
 ChatMessageRole = Literal["assistant", "user"]
@@ -53,6 +65,25 @@ class MutualNdaDraft(BaseModel):
     partyTwo: MutualNdaParty
 
 
+class GenericDocumentParty(BaseModel):
+    role: str = ""
+    name: str = ""
+    title: str = ""
+    company: str = ""
+    email: str = ""
+    address: str = ""
+
+
+class GenericDocumentDraft(BaseModel):
+    documentTitle: str
+    effectiveDate: str
+    businessPurpose: str
+    governingLaw: str
+    keyTerms: str
+    specialTerms: str
+    parties: list[GenericDocumentParty] = Field(default_factory=list)
+
+
 class PartialMutualNdaParty(BaseModel):
     printName: str | None = None
     title: str | None = None
@@ -73,6 +104,10 @@ class PartialMutualNdaDraft(BaseModel):
     modifications: str | None = None
     partyOne: PartialMutualNdaParty | None = None
     partyTwo: PartialMutualNdaParty | None = None
+
+
+DocumentDraft = MutualNdaDraft | GenericDocumentDraft
+PartialDocumentDraft = PartialMutualNdaDraft
 
 
 class ChatQuestion(BaseModel):
@@ -99,14 +134,14 @@ class DocumentDraftSnapshot(BaseModel):
     documentKey: DocumentKey
     status: DraftStatus
     inputMode: InputMode
-    draft: MutualNdaDraft
+    draft: DocumentDraft
     chat: DocumentDraftChatState = Field(default_factory=DocumentDraftChatState)
 
 
 class SaveDocumentDraftRequest(BaseModel):
     status: DraftStatus
     inputMode: InputMode
-    draft: MutualNdaDraft
+    draft: DocumentDraft
     chat: DocumentDraftChatState = Field(default_factory=DocumentDraftChatState)
 
 
@@ -116,7 +151,7 @@ class DocumentDraftResponse(BaseModel):
 
 class ChatTurnRequest(BaseModel):
     message: str
-    draft: MutualNdaDraft
+    draft: DocumentDraft
     chat: DocumentDraftChatState = Field(default_factory=DocumentDraftChatState)
 
     @field_validator("message")
@@ -130,15 +165,17 @@ class ChatTurnRequest(BaseModel):
 
 class ChatTurnResult(BaseModel):
     assistantMessage: str
-    fieldUpdates: PartialMutualNdaDraft = Field(default_factory=PartialMutualNdaDraft)
+    fieldUpdates: dict[str, Any] = Field(default_factory=dict)
     questionGroups: list[ChatQuestionGroup] = Field(default_factory=list)
     readyForReview: bool = False
+    switchTo: DocumentKey | None = None
 
 
 class ChatTurnResponse(BaseModel):
     draft: DocumentDraftSnapshot
     assistantMessage: str
     readyForReview: bool
+    switchTo: DocumentKey | None = None
 
 
 class ReviewDraftResponse(BaseModel):
@@ -163,13 +200,44 @@ def create_default_mutual_nda_draft(initial_date: str = "") -> MutualNdaDraft:
     )
 
 
+def create_default_generic_document_draft(document_title: str, initial_date: str = "") -> GenericDocumentDraft:
+    return GenericDocumentDraft(
+        documentTitle=document_title,
+        effectiveDate=initial_date,
+        businessPurpose="",
+        governingLaw="",
+        keyTerms="",
+        specialTerms="",
+        parties=[
+            GenericDocumentParty(role="Party 1"),
+            GenericDocumentParty(role="Party 2"),
+        ],
+    )
+
+
+DEFAULT_GENERIC_DOCUMENT_TITLES: dict[DocumentKey, str] = {
+    "cloud-service-agreement": "Cloud Service Agreement",
+    "service-level-agreement": "Service Level Agreement",
+    "professional-services-agreement": "Professional Services Agreement",
+    "data-processing-agreement": "Data Processing Agreement",
+    "design-partner-agreement": "Design Partner Agreement",
+    "ai-addendum": "AI Addendum",
+    "pilot-agreement": "Pilot Agreement",
+    "software-license-agreement": "Software License Agreement",
+    "partnership-agreement": "Partnership Agreement",
+    "business-associate-agreement": "Business Associate Agreement",
+}
+
+
 def create_default_document_draft(document_key: DocumentKey) -> DocumentDraftSnapshot:
-    if document_key != "mutual-nda":
-        raise ValueError(f"Unsupported document key: {document_key}")
+    if document_key == "mutual-nda":
+        draft: DocumentDraft = create_default_mutual_nda_draft()
+    else:
+        draft = create_default_generic_document_draft(DEFAULT_GENERIC_DOCUMENT_TITLES[document_key])
 
     return DocumentDraftSnapshot(
         documentKey=document_key,
         status="draft",
         inputMode="form",
-        draft=create_default_mutual_nda_draft(),
+        draft=draft,
     )

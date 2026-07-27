@@ -1,15 +1,29 @@
-import { useState } from "react";
-import type { DocumentDraftSnapshot } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import type { DocumentDraftSnapshot, DocumentKey } from "@/lib/api";
 
 type DocumentChatPanelProps = {
   draft: DocumentDraftSnapshot;
   isSubmitting: boolean;
   error: string | null;
+  switchSuggestion: DocumentKey | null;
+  onSwitch: (target: DocumentKey) => void;
   onSubmit: (message: string) => Promise<void>;
 };
 
-export function DocumentChatPanel({ draft, isSubmitting, error, onSubmit }: DocumentChatPanelProps) {
+export function DocumentChatPanel({ draft, isSubmitting, error, switchSuggestion, onSwitch, onSubmit }: DocumentChatPanelProps) {
   const [message, setMessage] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const transcriptLength = draft.chat.messages.length;
+
+  useEffect(() => {
+    if (isSubmitting) {
+      return;
+    }
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.focus();
+    }
+  }, [transcriptLength, isSubmitting]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -20,6 +34,10 @@ export function DocumentChatPanel({ draft, isSubmitting, error, onSubmit }: Docu
     const currentMessage = message;
     setMessage("");
     await onSubmit(currentMessage);
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.focus();
+    }
   }
 
   return (
@@ -29,9 +47,11 @@ export function DocumentChatPanel({ draft, isSubmitting, error, onSubmit }: Docu
         <p>Answer grouped questions and keep the form draft in sync automatically.</p>
       </div>
 
-      <div className="chat-transcript" aria-label="Mutual NDA chat transcript">
+      <div className="chat-transcript" aria-label="Document chat transcript">
         {draft.chat.messages.length === 0 ? (
-          <p className="chat-empty">Start by describing the NDA parties, purpose, and preferred terms.</p>
+          <p className="chat-empty">
+            Describe the parties and business purpose, or tell the chat which document you need.
+          </p>
         ) : (
           draft.chat.messages.map((entry, index) => (
             <article key={`${entry.role}-${index}`} className={entry.role === "assistant" ? "chat-message chat-message-assistant" : "chat-message chat-message-user"}>
@@ -41,6 +61,17 @@ export function DocumentChatPanel({ draft, isSubmitting, error, onSubmit }: Docu
           ))
         )}
       </div>
+
+      {switchSuggestion ? (
+        <div className="chat-switch-suggestion card">
+          <p>
+            I can switch to a {switchSuggestion.replace(/-/g, " ")} draft instead.
+          </p>
+          <button className="primary-button" type="button" onClick={() => onSwitch(switchSuggestion)}>
+            Switch draft
+          </button>
+        </div>
+      ) : null}
 
       <div className="chat-question-groups">
         {draft.chat.questionGroups.map((group) => (
@@ -63,8 +94,9 @@ export function DocumentChatPanel({ draft, isSubmitting, error, onSubmit }: Docu
             name="chat-message"
             rows={4}
             value={message}
+            ref={textareaRef}
             onChange={(event) => setMessage(event.target.value)}
-            placeholder="Describe the agreement parties, term preferences, or answer the grouped questions above."
+            placeholder="Describe the parties, term preferences, or ask to switch documents."
           />
         </label>
         <div className="actions">

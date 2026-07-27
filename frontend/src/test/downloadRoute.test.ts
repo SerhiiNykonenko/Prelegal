@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MutualNdaFormData } from "@/lib/mutualNdaSchema";
+import type { GenericDocumentDraft } from "@/lib/api";
 
 const basePayload: MutualNdaFormData = {
   purpose: "Evaluate a partnership.",
@@ -27,6 +28,19 @@ const basePayload: MutualNdaFormData = {
   },
 };
 
+const genericPayload: GenericDocumentDraft = {
+  documentTitle: "Data Processing Agreement",
+  effectiveDate: "2026-08-01",
+  businessPurpose: "Processing customer records under GDPR.",
+  governingLaw: "Ireland",
+  keyTerms: "Processor acts only on documented instructions.",
+  specialTerms: "",
+  parties: [
+    { role: "Controller", name: "Acme", title: "CEO", company: "Acme Ltd", email: "dpo@acme.test", address: "1 Dublin Rd" },
+    { role: "Processor", name: "Beta", title: "CFO", company: "Beta Ltd", email: "ops@beta.test", address: "2 Cork Rd" },
+  ],
+};
+
 afterEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
@@ -34,7 +48,7 @@ afterEach(() => {
 });
 
 describe("POST /api/download", () => {
-  it("returns a PDF attachment for a valid payload", async () => {
+  it("returns a PDF attachment for a valid Mutual NDA payload", async () => {
     vi.doMock("@/lib/templates", () => ({
       loadMutualNdaTemplates: vi.fn().mockResolvedValue({
         coverPage: "# Cover\n{{purpose}}\n{{partyOnePrintName}}\n{{partyTwoPrintName}}",
@@ -49,7 +63,7 @@ describe("POST /api/download", () => {
     const response = await POST(new Request("http://localhost/api/download", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(basePayload),
+      body: JSON.stringify({ documentKey: "mutual-nda", draft: basePayload }),
     }));
 
     expect(response.status).toBe(200);
@@ -61,19 +75,36 @@ describe("POST /api/download", () => {
     expect(bytes.toString("utf8")).toContain("%PDF-mocked-output");
   });
 
+  it("returns a PDF attachment for a valid generic document payload", async () => {
+    vi.doMock("@/lib/pdf", () => ({
+      createMutualNdaPdf: vi.fn().mockResolvedValue(Buffer.from("%PDF-generic-output", "utf8")),
+    }));
+
+    const { POST } = await import("@/app/api/download/route");
+    const response = await POST(new Request("http://localhost/api/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ documentKey: "data-processing-agreement", draft: genericPayload }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("application/pdf");
+    expect(response.headers.get("Content-Disposition")).toContain("data-processing-agreement.pdf");
+  });
+
   it("returns 400 field errors for invalid payloads", async () => {
     const { POST } = await import("@/app/api/download/route");
     const response = await POST(new Request("http://localhost/api/download", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...basePayload, partyOne: { ...basePayload.partyOne, printName: " " } }),
+      body: JSON.stringify({ documentKey: "mutual-nda", draft: { ...basePayload, partyOne: { ...basePayload.partyOne, printName: " " } } }),
     }));
 
     expect(response.status).toBe(400);
     expect(response.headers.get("Content-Type")).toContain("application/json");
 
     const payload = await response.json();
-    expect(payload.error).toBe("Invalid NDA fields");
+    expect(payload.error).toBe("Invalid document fields");
     expect(payload.fieldErrors["partyOne.printName"]).toBeTruthy();
   });
 
@@ -92,7 +123,7 @@ describe("POST /api/download", () => {
     const response = await POST(new Request("http://localhost/api/download", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(basePayload),
+      body: JSON.stringify({ documentKey: "mutual-nda", draft: basePayload }),
     }));
 
     expect(response.status).toBe(500);
