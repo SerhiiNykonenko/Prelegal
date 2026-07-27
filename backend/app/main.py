@@ -1,14 +1,17 @@
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import Cookie, FastAPI, Header, HTTPException
+from fastapi import Cookie, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.db import get_connection, initialize_database
-from app.repositories.document_drafts import get_or_create_document_draft, save_document_draft
-from app.repositories.users import normalize_email, upsert_user_for_fake_login
+from app.repositories.document_drafts import get_or_create_document_draft, list_recent_document_drafts, save_document_draft
+from app.repositories.sessions import create_session, delete_expired_sessions, delete_session, get_user_by_session_token
+from app.repositories.users import create_user, get_user_by_email, normalize_email, verify_password
 from app.schema import (
+    AuthRequest,
+    AuthResponse,
     ChatMessage,
     ChatTurnRequest,
     ChatTurnResponse,
@@ -16,11 +19,11 @@ from app.schema import (
     DocumentDraftResponse,
     DocumentKey,
     GenericDocumentDraft,
-    LoginRequest,
-    LoginResponse,
     MutualNdaDraft,
+    RecentDocumentDraftsResponse,
     ReviewDraftResponse,
     SaveDocumentDraftRequest,
+    SessionResponse,
     create_default_document_draft,
 )
 from app.services.document_chat import DocumentChatService
@@ -37,22 +40,50 @@ app = FastAPI(title="Prelegal Backend", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 chat_service = DocumentChatService()
+SESSION_COOKIE_NAME = "prelegal_session"
 
 
 from datetime import datetime, timezone
 
 
-def get_session_email(prelegal_session: str | None, x_session_email: str | None) -> str:
-    session_email = x_session_email or prelegal_session
-    if not session_email:
+def _set_session_cookie(response: Response, token: str) -> None:
+    settings = get_settings()
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        token,
+        httponly=True,
+        secure=settings.secure_cookies,
+        samesite="lax",
+        path="/",
+        max_age=settings.session_days * 24 * 60 * 60,
+    )
+
+
+def _clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+
+
+def get_current_user(prelegal_session: str | None) -> dict[str, int | str]:
+    if not prelegal_session:
         raise HTTPException(status_code=401, detail="Session required")
-    return normalize_email(session_email)
+
+    settings = get_settings()
+    with get_connection(settings.database_path) as connection:
+        row = get_user_by_session_token(connection, prelegal_session)
+
+    if row is None:
+        raise HTTPException(status_code=401, detail="Session required")
+    return {"id": row["id"], "email": normalize_email(row["email"])}
+
+
+def get_current_user_email(prelegal_session: str | None) -> str:
+    return str(get_current_user(prelegal_session)["email"])
 
 
 def _today_iso() -> str:
@@ -64,21 +95,63 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/api/session-login", response_model=LoginResponse)
-def session_login(payload: LoginRequest) -> LoginResponse:
+@app.post("/api/auth/sign-up", response_model=AuthResponse)
+def sign_up(payload: AuthRequest, response: Response) -> AuthResponse:
     settings = get_settings()
     with get_connection(settings.database_path) as connection:
-        user = upsert_user_for_fake_login(connection, payload.email, payload.password)
-    return LoginResponse(user=user)
+        if get_user_by_email(connection, payload.email) is not None:
+            raise HTTPException(status_code=409, detail="An account with this email already exists")
+        user = create_user(connection, payload.email, payload.password)
+        delete_expired_sessions(connection)
+        token, _ = create_session(connection, user_id=int(user["id"]), session_days=settings.session_days)
+    _set_session_cookie(response, token)
+    return AuthResponse(user=user)
+
+
+@app.post("/api/auth/sign-in", response_model=AuthResponse)
+def sign_in(payload: AuthRequest, response: Response) -> AuthResponse:
+    settings = get_settings()
+    with get_connection(settings.database_path) as connection:
+        row = get_user_by_email(connection, payload.email)
+        if row is None or not verify_password(payload.password, row["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        user = {"id": row["id"], "email": row["email"]}
+        delete_expired_sessions(connection)
+        token, _ = create_session(connection, user_id=int(user["id"]), session_days=settings.session_days)
+    _set_session_cookie(response, token)
+    return AuthResponse(user=user)
+
+
+@app.post("/api/auth/sign-out")
+def sign_out(response: Response, prelegal_session: str | None = Cookie(default=None)) -> dict[str, bool]:
+    if prelegal_session:
+        settings = get_settings()
+        with get_connection(settings.database_path) as connection:
+            delete_session(connection, prelegal_session)
+    _clear_session_cookie(response)
+    return {"ok": True}
+
+
+@app.get("/api/auth/session", response_model=SessionResponse)
+def auth_session(prelegal_session: str | None = Cookie(default=None)) -> SessionResponse:
+    return SessionResponse(user=get_current_user(prelegal_session))
+
+
+@app.get("/api/document-drafts", response_model=RecentDocumentDraftsResponse)
+def recent_document_drafts(prelegal_session: str | None = Cookie(default=None)) -> RecentDocumentDraftsResponse:
+    current_user = get_current_user_email(prelegal_session)
+    settings = get_settings()
+    with get_connection(settings.database_path) as connection:
+        drafts = list_recent_document_drafts(connection, user_email=current_user)
+    return RecentDocumentDraftsResponse(drafts=drafts)
 
 
 @app.get("/api/document-drafts/{document_key}", response_model=DocumentDraftResponse)
 def load_document_draft(
     document_key: str,
     prelegal_session: str | None = Cookie(default=None),
-    session_email: str | None = Header(default=None, alias="x-session-email"),
 ) -> DocumentDraftResponse:
-    current_user = get_session_email(prelegal_session, session_email)
+    current_user = get_current_user_email(prelegal_session)
     settings = get_settings()
     with get_connection(settings.database_path) as connection:
         draft = get_or_create_document_draft(
@@ -110,9 +183,8 @@ def update_document_draft(
     document_key: str,
     payload: SaveDocumentDraftRequest,
     prelegal_session: str | None = Cookie(default=None),
-    session_email: str | None = Header(default=None, alias="x-session-email"),
 ) -> DocumentDraftResponse:
-    current_user = get_session_email(prelegal_session, session_email)
+    current_user = get_current_user_email(prelegal_session)
     settings = get_settings()
     with get_connection(settings.database_path) as connection:
         draft = save_document_draft(
@@ -129,9 +201,8 @@ def create_chat_turn(
     document_key: DocumentKey,
     payload: ChatTurnRequest,
     prelegal_session: str | None = Cookie(default=None),
-    session_email: str | None = Header(default=None, alias="x-session-email"),
 ) -> ChatTurnResponse:
-    current_user = get_session_email(prelegal_session, session_email)
+    current_user = get_current_user_email(prelegal_session)
     result = chat_service.process_chat_turn(payload)
 
     if result.switchTo is not None and result.switchTo != document_key:
@@ -209,9 +280,8 @@ def review_document_draft(
     document_key: DocumentKey,
     payload: SaveDocumentDraftRequest,
     prelegal_session: str | None = Cookie(default=None),
-    session_email: str | None = Header(default=None, alias="x-session-email"),
 ) -> ReviewDraftResponse:
-    get_session_email(prelegal_session, session_email)
+    get_current_user_email(prelegal_session)
     field_errors = validate_draft_for_review(payload.draft)
 
     return ReviewDraftResponse(

@@ -4,7 +4,7 @@ async function login(page: import("@playwright/test").Page) {
   await page.goto("/login");
   await page.getByLabel("Email").fill("user@example.com");
   await page.getByLabel("Password").fill("secret");
-  await page.getByRole("button", { name: "Enter workspace" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/app$/);
 }
 

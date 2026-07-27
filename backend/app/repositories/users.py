@@ -1,4 +1,7 @@
 from datetime import UTC, datetime
+import hashlib
+import hmac
+import secrets
 import sqlite3
 
 
@@ -6,22 +9,37 @@ def normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
-def upsert_user_for_fake_login(connection: sqlite3.Connection, email: str, password_text: str) -> dict[str, int | str]:
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    password_hash = hashlib.scrypt(password.encode("utf-8"), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
+    return f"scrypt${salt}${password_hash}"
+
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    algorithm, salt, password_hash = stored_hash.split("$", 2)
+    if algorithm != "scrypt":
+        return False
+    candidate = hashlib.scrypt(password.encode("utf-8"), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
+    return hmac.compare_digest(candidate, password_hash)
+
+
+def create_user(connection: sqlite3.Connection, email: str, password: str) -> dict[str, int | str]:
     normalized_email = normalize_email(email)
     now = datetime.now(UTC).isoformat()
-    connection.execute(
+    cursor = connection.execute(
         """
-        INSERT INTO users (email, password_text, created_at, updated_at)
+        INSERT INTO users (email, password_hash, created_at, updated_at)
         VALUES (?, ?, ?, ?)
-        ON CONFLICT(email) DO UPDATE SET
-            password_text = excluded.password_text,
-            updated_at = excluded.updated_at
         """,
-        (normalized_email, password_text, now, now),
+        (normalized_email, hash_password(password), now, now),
     )
     connection.commit()
-    user = connection.execute(
-        "SELECT id, email FROM users WHERE email = ?",
+    return {"id": cursor.lastrowid, "email": normalized_email}
+
+
+def get_user_by_email(connection: sqlite3.Connection, email: str) -> sqlite3.Row | None:
+    normalized_email = normalize_email(email)
+    return connection.execute(
+        "SELECT id, email, password_hash FROM users WHERE email = ?",
         (normalized_email,),
     ).fetchone()
-    return {"id": user["id"], "email": user["email"]}

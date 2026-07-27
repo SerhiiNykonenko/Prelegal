@@ -6,15 +6,18 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 
+def _register(client: TestClient, email: str, password: str = "secret") -> None:
+    response = client.post("/api/auth/sign-up", json={"email": email, "password": password})
+    assert response.status_code == 200, response.text
+
+
 def test_load_document_draft_creates_default_snapshot(tmp_path: Path, monkeypatch) -> None:
     database_path = tmp_path / "drafts.db"
     monkeypatch.setenv("DATABASE_PATH", str(database_path))
 
     with TestClient(app) as client:
-        response = client.get(
-            "/api/document-drafts/mutual-nda",
-            cookies={"prelegal_session": "User@example.com"},
-        )
+        _register(client, "user@example.com")
+        response = client.get("/api/document-drafts/mutual-nda")
 
     assert response.status_code == 200
     payload = response.json()["draft"]
@@ -79,15 +82,9 @@ def test_update_document_draft_persists_snapshot(tmp_path: Path, monkeypatch) ->
     }
 
     with TestClient(app) as client:
-        response = client.put(
-            "/api/document-drafts/mutual-nda",
-            headers={"x-session-email": "user@example.com"},
-            json=payload,
-        )
-        reload_response = client.get(
-            "/api/document-drafts/mutual-nda",
-            cookies={"prelegal_session": "USER@example.com"},
-        )
+        _register(client, "user@example.com")
+        response = client.put("/api/document-drafts/mutual-nda", json=payload)
+        reload_response = client.get("/api/document-drafts/mutual-nda")
 
     assert response.status_code == 200
     assert reload_response.status_code == 200

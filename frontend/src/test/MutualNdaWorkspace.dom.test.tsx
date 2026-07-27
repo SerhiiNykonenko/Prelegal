@@ -76,7 +76,7 @@ describe("MutualNdaWorkspace", () => {
       expect(fetchMock).toHaveBeenCalledWith(
         "http://localhost:8000/api/document-drafts/mutual-nda",
         expect.objectContaining({
-          headers: expect.any(Headers),
+          credentials: "include",
         }),
       );
     });
